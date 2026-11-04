@@ -1,6 +1,8 @@
 Create database obligatorio default character set utf8 collate utf8_spanish_ci;
 use obligatorio;
 
+-- Creación de tablas
+
 Create table login(
     correo VARCHAR(70) PRIMARY KEY,
     contraseña VARCHAR(120) NOT NULL,
@@ -47,6 +49,7 @@ CREATE TABLE equipo(
     UNIQUE (nombre)
 );
 
+-- Relaciona un equipo existente con el torneo que va a jugar y declara su capitán
 CREATE TABLE equipo_torneo(
     id_equipo INT,
     id_torneo INT,
@@ -58,6 +61,7 @@ CREATE TABLE equipo_torneo(
     UNIQUE (ci_capitan,id_torneo)
 );
 
+-- Relaciona cada jugador con su respectivo equipo y les asigna su número de camiseta
 Create table equipo_jugador_torneo(
     id_equipo INT NOT NULL,
     ci_jugador INT NOT NULL,
@@ -118,6 +122,7 @@ Create table partido(
     FOREIGN KEY (nombre_cancha, id_complejo) REFERENCES cancha(nombre_cancha, id_complejo)
 );
 
+-- Registra los jugadores que realmente jugaron ese partido (hay 10 jugadores y juegan 5)
 Create table planilla_partido(
     id_partido INT,
     id_torneo INT NOT NULL,
@@ -168,6 +173,7 @@ Create table sancion_jugador(
     FOREIGN KEY (ci_jugador) REFERENCES jugador(ci)
 );
 
+-- Fue creada para registrar cualquier cambio de capitán que se de en el partido
 Create Table capitan_partido(
     id_partido INT,
     id_torneo INT,
@@ -181,14 +187,19 @@ Create Table capitan_partido(
     FOREIGN KEY (id_equipo, ci_jugador, id_torneo) REFERENCES equipo_jugador_torneo (id_equipo, ci_jugador, id_torneo)
 );
 
+-- Creación de usuarios válidos para ingresar al sistema
 CREATE USER 'admin@ucu.edu.uy' IDENTIFIED BY 'ADMIN123';
 CREATE USER 'planilla@ucu.edu.uy' IDENTIFIED BY 'PLANILLERO123';
 CREATE USER 'jugador@correo.ucu.edu.uy' IDENTIFIED BY 'JUGADOR123';
 
+
+-- Gestionamos los permisos de cada usuario según corresponda a su rol
+-- Administrador: todos los permisos
 GRANT ALL PRIVILEGES
 ON obligatorio.*
 TO 'admin@ucu.edu.uy';
 
+-- Planillero: permiso para consultar, registrar y actualizar datos en ciertas tablas
 GRANT SELECT
 ON obligatorio.partido
 TO 'planilla@ucu.edu.uy';
@@ -220,6 +231,7 @@ GRANT UPDATE
 ON obligatorio.planilla_partido
 TO 'planilla@ucu.edu.uy';
 
+-- Jugador: solo tiene permitido consultar ciertas tablas
 GRANT SELECT
 ON obligatorio.partido
 TO 'jugador@correo.ucu.edu.uy';
@@ -232,6 +244,9 @@ TO 'jugador@correo.ucu.edu.uy';
 GRANT SELECT
 ON obligatorio.sancion_jugador
 TO 'jugador@correo.ucu.edu.uy';
+
+
+-- Definimos los triggers necesarios para la insercción de los datos (el nombre de cada uno describe lo que hace)
 
 DELIMITER //
 
@@ -533,6 +548,8 @@ END;//
 DELIMITER ;
 
 
+
+-- Insertamos los valores en cada una de las tablas
 
 INSERT INTO facultad VALUES
 (1,'Facultad de Ingeniería y Tecnologías - MVD'),
@@ -954,6 +971,10 @@ INSERT INTO gol VALUES
 (28,8,1,60606060,48,false);
 
 
+-- Realizamos las consultas que se pedían 
+
+-- 1: Cantidad de jugadores por facultad y por tipo 
+-- Por facultad:
 SELECT f.nombre, COUNT(*) AS cantidad_jugadores
 FROM facultad f
 JOIN jugador j
@@ -961,14 +982,19 @@ JOIN jugador j
 GROUP BY f.id_facultad, f.nombre
 ORDER BY cantidad_jugadores DESC;
 
+-- Por tipo:
 SELECT tipo, COUNT(*) AS cantidad
 FROM jugador
 GROUP BY tipo;
 
+
+-- 2: Cantidad de sanciones por equipo y por motivo
+-- Por motivo:
 SELECT motivo, COUNT(*) AS cantidad
 FROM sancion_jugador
 GROUP BY motivo;
 
+-- Por equipo:
 SELECT e.nombre AS equipo, COUNT(*) AS cantidad_sanciones
 FROM sancion_jugador s
 JOIN equipo_jugador_torneo ejt
@@ -979,6 +1005,8 @@ JOIN equipo e
 GROUP BY e.id_equipo, e.nombre
 ORDER BY cantidad_sanciones DESC;
 
+
+-- 3: Tabla de goleadores
 SELECT j.ci, j.nombre, j.apellido, COUNT(*) AS goles
 FROM gol g
 JOIN jugador j
@@ -987,6 +1015,8 @@ GROUP BY j.ci, j.nombre, j.apellido
 ORDER BY goles DESC
 LIMIT 10;
 
+
+-- 4: Jugadores inscriptos en un plantel que nunca figuraron en una planilla de juego
 SELECT j.ci, j.nombre, j.apellido
 FROM jugador j
 JOIN equipo_jugador_torneo ejt
@@ -997,12 +1027,16 @@ WHERE NOT EXISTS (
     WHERE pp.ci_jugador = j.ci
 );
 
+
+-- 5: Canchas y turnos más utilizados
+-- Canchas:
 SELECT nombre_cancha, COUNT(*) AS cantidad_usos
 FROM partido
 WHERE estado = 'jugado'
 GROUP BY nombre_cancha
 ORDER BY cantidad_usos DESC;
 
+-- Turnos:
 SELECT t.id_turno, t.hora_inicio, t.hora_fin, COUNT(*) AS cantidad_usos
 FROM partido p
 JOIN turno t
@@ -1011,6 +1045,9 @@ WHERE p.estado = 'jugado'
 GROUP BY t.id_turno, t.hora_inicio, t.hora_fin
 ORDER BY cantidad_usos DESC;
 
+
+-- 6: Promedio de goles por partido en cada fecha y en toda la edición
+-- Por fecha:
 SELECT p.numero_fecha, COUNT(g.id_gol) * 1.0 / COUNT(DISTINCT p.id_partido) AS promedio_goles
 FROM partido p
 LEFT JOIN gol g
@@ -1020,6 +1057,7 @@ WHERE p.estado = 'jugado'
 GROUP BY p.numero_fecha
 ORDER BY p.numero_fecha;
 
+-- En toda la edición
 SELECT COUNT(g.id_gol) * 1.0 / COUNT(DISTINCT p.id_partido) AS promedio_goles_torneo
 FROM partido p
 LEFT JOIN gol g
@@ -1027,18 +1065,25 @@ LEFT JOIN gol g
    AND p.id_torneo = g.id_torneo
 WHERE p.estado = 'jugado';
 
+
+-- 7: Porcentaje de partidos jugados vs. postergados/cancelados
+-- El 23,07692% que falta para completar el 100% es de los programados
+-- Porcentaje de jugados
 SELECT
     COUNT(*) * 100.0 /
     (SELECT COUNT(*) FROM partido) AS porcentaje_jugados
 FROM partido
 WHERE estado = 'jugado';
 
+-- Porcentaje de postergados
 SELECT
     COUNT(*) * 100.0 /
     (SELECT COUNT(*) FROM partido) AS porcentaje_postergados
 FROM partido
 WHERE estado = 'postergado';
 
+
+-- 8: Tabla de fair play por equipo
 SELECT e.nombre,
     SUM(
         CASE
@@ -1055,6 +1100,10 @@ JOIN equipo e
 GROUP BY e.id_equipo, e.nombre
 ORDER BY puntaje_fair_play ASC;
 
+
+-- Realizamos las 3 consultas a elección nuestra 
+
+-- 1: Top 10 jugadores con más sanciones
 SELECT j.ci, j.nombre, j.apellido, COUNT(*) AS cantidad_sanciones
 FROM sancion_jugador s
 JOIN jugador j
@@ -1063,6 +1112,8 @@ GROUP BY j.ci, j.nombre, j.apellido
 ORDER BY cantidad_sanciones DESC
 LIMIT 10;
 
+
+-- 2: Top 3 facultades con más goles
 SELECT f.nombre, COUNT(*) AS goles
 FROM gol g
 JOIN jugador j
@@ -1073,6 +1124,8 @@ GROUP BY f.id_facultad, f.nombre
 ORDER BY goles DESC
 LIMIT 3;
 
+
+-- 3: Jugador con más tarjetas sacadas
 SELECT j.ci, j.nombre, j.apellido, COUNT(*) AS cantidad_tarjetas
 FROM tarjeta t
 JOIN jugador j
