@@ -1,0 +1,26 @@
+# Cosas que no queremos copiar en la construcción de Docker
+
+# Archivos de control de versiones: no hacen falta en la imagen
+.git
+.gitignore
+
+# Entornos y archivos temporales de Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Claves ni configuración local
+.env
+.env.*
+!.env.example
+
+# Documentación y archivos SQL
+Docs/
+BaseDeDatos/
+Dockerización/
+
+# Archivos locales del sistema operativo y del editor
+.vscode/
+.idea/
+Thumbs.db

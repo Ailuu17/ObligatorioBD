@@ -192,6 +192,56 @@ python app.py
 
 ---
 
+## Dockerización (base inicial)
+
+La carpeta `Dockerización` contiene una configuración inicial para ejecutar el
+backend Python junto con MySQL. Como `Backend/Backend.py` aún no tiene código,
+el contenedor del backend terminará enseguida; el comando de inicio y el puerto
+se ajustarán cuando la API esté implementada.
+
+### Requisitos
+
+- Docker Desktop instalado y abierto.
+- Ejecutar los comandos desde la carpeta principal del repositorio.
+
+### Preparar y arrancar
+
+En PowerShell, copia el archivo de ejemplo:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edita `.env` y cambia las contraseñas de ejemplo. Luego construye la imagen e
+inicia los servicios:
+
+```powershell
+docker compose -f Dockerización/docker-compose.yml up --build -d
+```
+
+Para ver los mensajes de los contenedores:
+
+```powershell
+docker compose -f Dockerización/docker-compose.yml logs -f
+```
+
+MySQL queda disponible desde esta computadora en `localhost:3307`. Entre
+contenedores, el backend debe conectarse al host `db` y al puerto `3306`; Docker
+les proporciona esa red automáticamente. La configuración aún no ejecuta
+`BaseDeDatos/DataGrip.sql`: ese script crea la base y usuarios, por lo que su
+inicialización se coordinará con la configuración final de la aplicación.
+
+Para detener los servicios sin borrar los datos:
+
+```powershell
+docker compose -f Dockerización/docker-compose.yml down
+```
+
+El volumen de MySQL conserva la información. No uses `down -v` salvo que
+realmente quieras borrarla.
+
+---
+
 ## Estructura del proyecto
 
 ```Txt

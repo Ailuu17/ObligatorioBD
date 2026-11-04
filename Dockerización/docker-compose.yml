@@ -1,0 +1,44 @@
+services:
+  # Servicio del backend Python
+  backend:
+    build:
+      # El contexto es la carpeta principal del repositorio
+      context: ..
+      dockerfile: Dockerización/Dockerfile
+    environment:
+      # Dentro de Docker se usa el nombre del servicio de MySQL, no localhost
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-obligatorio}
+      DB_USER: ${DB_USER:-usuario_app}
+      DB_PASSWORD: ${DB_PASSWORD:-cambia_esta_clave}
+    depends_on:
+      db:
+        # Espera a que MySQL acepte conexiones antes de iniciar Python
+        condition: service_healthy
+    # El puerto HTTP se agrega cuando la API defina cual usará
+
+  # Base de datos MySQL para desarrollo local
+  db:
+    image: mysql:8.4
+    environment:
+      # Esta clave es solo para el usuario administrador de MySQL
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cambia_esta_clave_root}
+    ports:
+      # Expone MySQL solo en esta computadora, en el puerto local 3307
+      # Los otros contenedores se conectan por db:3306
+      - "127.0.0.1:3307:3306"
+    volumes:
+      # Conserva los datos aunque se detengan o reconstruyan los contenedores
+      - datos_mysql:/var/lib/mysql
+    healthcheck:
+      # Docker usa este chequeo para saber cuándo MySQL está listo
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=root --password=\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  # Volumen persistente administrado por Docker
+  datos_mysql:
