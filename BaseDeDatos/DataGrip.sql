@@ -1101,6 +1101,82 @@ GROUP BY e.id_equipo, e.nombre
 ORDER BY puntaje_fair_play ASC;
 
 
+-- 9: Tabla de posiciones por edición del torneo
+-- Asumimos como puntaje: 3 por victoria, 1 por empate y 0 por derrota.
+-- La posicion de cada equipo se determina por el orden de las filas
+SELECT t.nombre AS torneo, t.año, t.semestre, e.nombre AS equipo,
+       -- Contamos los partidos jugados
+       COUNT(r.id_partido) AS partidos_jugados,
+       -- Contamos los partidos ganados, empatados y perdidos
+       COUNT(CASE WHEN r.goles_favor > r.goles_contra THEN 1 END) AS partidos_ganados,
+       COUNT(CASE WHEN r.goles_favor = r.goles_contra THEN 1 END) AS partidos_empatados,
+       COUNT(CASE WHEN r.goles_favor < r.goles_contra THEN 1 END) AS partidos_perdidos,
+       CASE
+           WHEN COUNT(r.id_partido) = 0 THEN 0
+           ELSE SUM(r.goles_favor)
+       END AS goles_favor,
+       CASE
+           WHEN COUNT(r.id_partido) = 0 THEN 0
+           ELSE SUM(r.goles_contra)
+       END AS goles_contra,
+       CASE
+           WHEN COUNT(r.id_partido) = 0 THEN 0
+           ELSE SUM(r.goles_favor) - SUM(r.goles_contra)
+       END AS diferencia_goles,
+       -- Indicamos cuantos puntos se obtienen en cada caso y sumamos para obtener el total de puntos del equipo
+       SUM(CASE
+               WHEN r.goles_favor > r.goles_contra THEN 3
+               WHEN r.goles_favor = r.goles_contra THEN 1
+               ELSE 0
+           END) AS puntos
+FROM equipo_torneo et
+JOIN torneo t
+    ON t.id_torneo = et.id_torneo
+JOIN equipo e
+    ON e.id_equipo = et.id_equipo
+LEFT JOIN (
+    -- Calculamos el resultado de cada partido para cada equipo que jugó
+    SELECT p.id_torneo, p.id_partido, et.id_equipo,
+           -- Contamos los goles a favor
+           COUNT(CASE
+                     WHEN (g.autogol = FALSE AND pp.id_equipo = et.id_equipo)
+                       OR (g.autogol = TRUE AND (
+                              (et.id_equipo = p.id_equipo_local AND pp.id_equipo = p.id_equipo_visitante)
+                           OR (et.id_equipo = p.id_equipo_visitante AND pp.id_equipo = p.id_equipo_local)
+                       ))
+                     THEN 1
+                 END) AS goles_favor,
+
+           -- Contamos los goles en contra
+           COUNT(CASE
+                     WHEN (g.autogol = FALSE AND (
+                              (et.id_equipo = p.id_equipo_local AND pp.id_equipo = p.id_equipo_visitante)
+                           OR (et.id_equipo = p.id_equipo_visitante AND pp.id_equipo = p.id_equipo_local)
+                       ))
+                       OR (g.autogol = TRUE AND pp.id_equipo = et.id_equipo)
+                     THEN 1
+                 END) AS goles_contra
+    FROM partido p
+    JOIN equipo_torneo et
+        ON et.id_torneo = p.id_torneo
+        AND (et.id_equipo = p.id_equipo_local OR et.id_equipo = p.id_equipo_visitante)
+    LEFT JOIN gol g
+        ON g.id_partido = p.id_partido
+        AND g.id_torneo = p.id_torneo
+    -- Usamos el equipo de la planilla del partido para identificar al goleador.
+    LEFT JOIN planilla_partido pp
+        ON pp.id_partido = g.id_partido
+       AND pp.id_torneo = g.id_torneo
+       AND pp.ci_jugador = g.ci_jugador
+    WHERE p.estado = 'jugado'
+    GROUP BY p.id_torneo, p.id_partido, et.id_equipo
+) r
+    ON r.id_torneo = et.id_torneo
+   AND r.id_equipo = et.id_equipo
+GROUP BY t.id_torneo, t.nombre, t.año, t.semestre, e.id_equipo, e.nombre
+ORDER BY t.id_torneo, puntos DESC, diferencia_goles DESC, goles_favor DESC, equipo;
+
+
 -- Realizamos las 3 consultas a elección nuestra 
 
 -- 1: Top 10 jugadores con más sanciones
