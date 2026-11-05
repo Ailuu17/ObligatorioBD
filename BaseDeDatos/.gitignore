@@ -1,0 +1,5 @@
+# Al hacer commit, se ignora cualquier archivo que comience 
+# con .env (configuración local) por que contiene contraseñas.
+.env
+.env.*
+!.env.example
