@@ -746,20 +746,18 @@ def admin_alta_partido(conexion):
         SELECT id_partido FROM partido
         WHERE id_torneo = %s AND numero_fecha = %s
           AND (id_equipo_local IN (%s, %s) OR id_equipo_visitante IN (%s, %s))
-          AND estado != 'postergado'
     """
     _, r_f = ejecutar_consulta(conexion, sql_fecha, (id_torneo, nro_fecha, id_local, id_visitante, id_local, id_visitante))
     if r_f:
         print(f"✗ Conflicto de fixture: Uno de los equipos ya tiene un partido programado en la fecha N° {nro_fecha} de este torneo.")
         return
 
-    # 4. No se enfrenten dos veces en la misma edición (liga a una sola rueda), salvo postergado
+    # 4. No se enfrenten dos veces en la misma edición (liga a una sola rueda)
     sql_duelo = """
         SELECT id_partido, estado FROM partido
         WHERE id_torneo = %s
           AND ((id_equipo_local = %s AND id_equipo_visitante = %s)
             OR (id_equipo_local = %s AND id_equipo_visitante = %s))
-          AND estado != 'postergado'
     """
     _, r_d = ejecutar_consulta(conexion, sql_duelo, (id_torneo, id_local, id_visitante, id_visitante, id_local))
     if r_d:
@@ -773,7 +771,7 @@ def admin_alta_partido(conexion):
 
     nombre_cancha = pedir_texto("Nombre Cancha")
     id_complejo = pedir_entero("ID Complejo")
-    estado = pedir_opcion("Estado inicial", ["programado", "postergado", "reprogramado", "jugado"])
+    estado = pedir_opcion("Estado inicial", ["programado", "postergado", "jugado"])
 
     if estado == 'jugado':
         # Validar si ya pasó
@@ -842,8 +840,25 @@ def admin_modificacion_partido(conexion):
 
     nuevo_estado = pedir_opcion(f"Nuevo Estado [{p_est}]", ["programado", "jugado", "postergado", "reprogramado"])
 
+    if nuevo_estado == "reprogramado":
+        if p_est not in ("postergado", "reprogramado"):
+            print("✗ Para reprogramar, el partido debe estar postergado o ya reprogramado.")
+            return
+        if (dia == str(p_dia) and id_turno == p_turno
+                and nombre_cancha == p_cancha and id_complejo == p_comp):
+            print("✗ Cambie la fecha, el turno o la cancha antes de marcar el partido como reprogramado.")
+            return
+
     if nuevo_estado == 'jugado' and p_est != 'jugado':
-        if not verificar_partido_ya_paso(conexion, id_partido, id_torneo):
+        _, turnos = ejecutar_consulta(
+            conexion, "SELECT hora_fin FROM turno WHERE id_turno = %s", (id_turno,)
+        )
+        if not turnos:
+            print("✗ No se encontró el turno seleccionado.")
+            return
+        dt_fin = parse_fecha_hora(dia, turnos[0][0])
+        if datetime.now() < dt_fin:
+            print(f"✗ El partido no se puede marcar como jugado antes de su fin programado ({dt_fin}).")
             return
 
     sql_upd = """
@@ -1291,6 +1306,7 @@ def submenu_reportes(conexion):
             """
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
+            print("El porcentaje restante corresponde a partidos programados o reprogramados.")
 
         elif opc == "10":
             sql = """

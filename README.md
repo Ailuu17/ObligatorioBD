@@ -91,6 +91,7 @@ No posee permisos de administración general.
 - Inscripción de equipos.
 - Programación de fechas.
 - Gestión de partidos.
+- La reprogramación modifica el registro del partido existente y conserva su fecha original del fixture.
 - Control de disponibilidad de canchas y horarios.
 
 ### Registro de Partidos
@@ -116,7 +117,7 @@ No posee permisos de administración general.
 - Estadísticas de jugadores por facultad.
 - Jugadores nunca convocados.
 - Sanciones por equipo y motivo.
-- Porcentaje de partidos jugados, postergados y cancelados.
+- Porcentaje de partidos jugados vs. postergados.
 - Consultas adicionales propuestas por el equipo.
 
 ---

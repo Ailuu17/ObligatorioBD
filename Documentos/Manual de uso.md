@@ -78,7 +78,7 @@ El menú de administración puede agrupar las opciones de la siguiente manera:
 5. Registrar complejos, canchas y turnos.
 6. Programar los partidos y luego consultar los reportes necesarios.
 
-El sistema rechaza datos que incumplan las reglas del torneo o las relaciones existentes. Por ejemplo, no se puede asociar un equipo o jugador que no esté registrado, ni programar dos veces el mismo enfrentamiento en una edición, salvo que el anterior haya sido pospuesto.
+El sistema rechaza datos que incumplan las reglas del torneo o las relaciones existentes. Por ejemplo, no se puede asociar un equipo o jugador que no esté registrado ni registrar dos veces el mismo enfrentamiento en una edición, aunque esté postergado. Para reprogramar un partido postergado, modifique el registro existente, cambie su fecha, turno o cancha y seleccione el estado `reprogramado`; la fecha del fixture original se conserva.
 
 ### 6. Funciones del planillero
 
@@ -114,7 +114,7 @@ El menú de reportes puede ofrecer las consultas previstas para el torneo:
 - Cantidad de jugadores por facultad y por tipo.
 - Jugadores inscriptos en un plantel que nunca figuraron en una planilla.
 - Cantidad de sanciones por equipo y por motivo.
-- Porcentaje de partidos jugados frente a postergados.
+- Porcentaje de partidos jugados vs. postergados. El porcentaje restante corresponde a partidos programados o reprogramados.
 - Consultas adicionales: jugadores con más sanciones, facultades con más goles y jugador con más tarjetas.
 
 Los resultados dependen de la información cargada y de los filtros seleccionados. Si no hay datos de partidos o planillas, algunos reportes pueden aparecer vacíos o incompletos.
