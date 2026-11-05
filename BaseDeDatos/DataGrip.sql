@@ -204,6 +204,12 @@ GRANT SELECT
 ON obligatorio.partido
 TO 'planilla@ucu.edu.uy';
 GRANT SELECT
+ON obligatorio.turno
+TO 'planilla@ucu.edu.uy';
+GRANT SELECT
+ON obligatorio.gol
+TO 'planilla@ucu.edu.uy';
+GRANT SELECT
 ON obligatorio.equipo
 TO 'planilla@ucu.edu.uy';
 GRANT SELECT
@@ -227,8 +233,14 @@ TO 'planilla@ucu.edu.uy';
 GRANT INSERT
 ON obligatorio.capitan_partido
 TO 'planilla@ucu.edu.uy';
+GRANT UPDATE (ci_jugador, minuto, autogol)
+ON obligatorio.gol
+TO 'planilla@ucu.edu.uy';
 GRANT UPDATE
 ON obligatorio.planilla_partido
+TO 'planilla@ucu.edu.uy';
+GRANT DELETE
+ON obligatorio.gol
 TO 'planilla@ucu.edu.uy';
 
 -- Jugador: solo tiene permitido consultar ciertas tablas
@@ -494,6 +506,97 @@ BEGIN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Jugador no figura en planilla';
 
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER trigger_gol_plazo_update
+BEFORE UPDATE
+ON gol
+FOR EACH ROW
+BEGIN
+
+    DECLARE estado_partido VARCHAR(15);
+    DECLARE fecha_partido DATE;
+    DECLARE hora_fin TIME;
+    DECLARE cantidad INT;
+
+    SELECT p.estado, p.dia, t.hora_fin
+    INTO estado_partido, fecha_partido, hora_fin
+    FROM partido p
+    JOIN turno t ON p.id_turno = t.id_turno
+    WHERE p.id_partido = OLD.id_partido
+      AND p.id_torneo = OLD.id_torneo;
+
+    IF estado_partido <> 'jugado'
+       OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
+       OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El resultado solo se puede corregir dentro de las 48 horas posteriores al fin del turno';
+    END IF;
+
+    SELECT COUNT(*)
+    INTO cantidad
+    FROM planilla_partido
+    WHERE id_partido = NEW.id_partido
+      AND id_torneo = NEW.id_torneo
+      AND ci_jugador = NEW.ci_jugador;
+
+    IF cantidad = 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Jugador no figura en planilla';
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER trigger_gol_plazo_delete
+BEFORE DELETE
+ON gol
+FOR EACH ROW
+BEGIN
+
+    DECLARE estado_partido VARCHAR(15);
+    DECLARE fecha_partido DATE;
+    DECLARE hora_fin TIME;
+
+    SELECT p.estado, p.dia, t.hora_fin
+    INTO estado_partido, fecha_partido, hora_fin
+    FROM partido p
+    JOIN turno t ON p.id_turno = t.id_turno
+    WHERE p.id_partido = OLD.id_partido
+      AND p.id_torneo = OLD.id_torneo;
+
+    IF estado_partido <> 'jugado'
+       OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
+       OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El resultado solo se puede corregir dentro de las 48 horas posteriores al fin del turno';
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER trigger_no_reprogramar_jugado
+BEFORE UPDATE
+ON partido
+FOR EACH ROW
+BEGIN
+
+    IF OLD.estado = 'jugado'
+       AND (NEW.estado <> OLD.estado OR NEW.dia <> OLD.dia OR NEW.id_turno <> OLD.id_turno) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se puede cambiar el estado, la fecha o el turno de un partido jugado';
     END IF;
 
 END;//
@@ -969,6 +1072,36 @@ INSERT INTO gol VALUES
 (26,8,1,20202020,9,false),
 (27,8,1,68955786,30,false),
 (28,8,1,60606060,48,false);
+
+DELIMITER //
+
+CREATE TRIGGER trigger_gol_plazo_insert
+BEFORE INSERT
+ON gol
+FOR EACH ROW
+BEGIN
+
+    DECLARE estado_partido VARCHAR(15);
+    DECLARE fecha_partido DATE;
+    DECLARE hora_fin TIME;
+
+    SELECT p.estado, p.dia, t.hora_fin
+    INTO estado_partido, fecha_partido, hora_fin
+    FROM partido p
+    JOIN turno t ON p.id_turno = t.id_turno
+    WHERE p.id_partido = NEW.id_partido
+      AND p.id_torneo = NEW.id_torneo;
+
+    IF estado_partido <> 'jugado'
+       OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
+       OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El resultado solo se puede cargar dentro de las 48 horas posteriores al fin del turno';
+    END IF;
+
+END;//
+
+DELIMITER ;
 
 
 -- Realizamos las consultas que se pedían 

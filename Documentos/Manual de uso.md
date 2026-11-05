@@ -93,13 +93,16 @@ Para registrar un partido:
 
 El resultado del partido se calcula automaticamente a partir de los goles ingresados; no se debe cargar manualmente. Solo pueden figurar jugadores de los dos equipos del partido que pertenezcan al plantel y no estén suspendidos. Los goles y las tarjetas deben corresponder a jugadores incluidos en la planilla.
 
+Si el partido ya está marcado como jugado, el planillero puede modificar o eliminar goles durante las 48 horas posteriores al fin programado del turno. El programa calcula el plazo con la hora local del equipo donde se ejecuta; MySQL también lo verifica al guardar. Para evitar diferencias entre ambas validaciones, los relojes deben estar sincronizados.
+
 ### 7. Sanciones y reglas de los torneos
 
 - Una tarjeta roja o la acumulación de tres tarjetas amarillas en la edición genera una suspensión automática de una fecha.
 - La suspensión se cumple en la fecha siguiente del torneo. Un jugador suspendido no puede incluirse en la planilla de un partido que se abarque por esa sanción.
 - La organización puede registrar sanciones disciplinarias de varias fechas.
 - Un partido solo puede marcarse como jugado una vez que su día y turno hayan pasado.
-- Un partido jugado no se puede eliminar. La corrección de su resultado está limitada a las 48 horas posteriores a su disputa.
+- Un partido jugado no se puede eliminar. La corrección de su resultado está limitada a las 48 horas posteriores al fin programado del turno.
+- Una vez que el partido está jugado, no se puede cambiar su estado, fecha ni turno.
 - Al programar partidos, se deben respetar la disponibilidad de equipos, turnos y canchas. No se debe asignar más de un partido a un equipo en una fecha ni más de un partido a una cancha en el mismo día y turno.
 
 ### 8. Reportes disponibles para consultas

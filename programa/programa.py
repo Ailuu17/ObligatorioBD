@@ -29,6 +29,7 @@ Módulos y Roles implementados:
   2. Planillero:
      - Registrar Planilla de Partido
      - Registrar Gol (Restricción de 48hs posteriores al partido)
+     - Modificar o eliminar goles dentro del plazo permitido
      - Registrar Tarjeta
      - Registrar Capitán de Partido
      - Finalizar Partido (Solo se puede marcar como jugado si ya pasó la fecha y hora)
@@ -325,17 +326,23 @@ def verificar_resultado_es_modificable(conexion, id_partido, id_torneo):
         return False
 
     estado, p_dia, hora_fin = rows[0]
-    if estado == 'jugado':
-        dt_fin = parse_fecha_hora(p_dia, hora_fin)
-        ahora = datetime.now()
-        horas_transcurridas = (ahora - dt_fin).total_seconds() / 3600.0
+    if estado != 'jugado':
+        print("✗ Solo se puede registrar o corregir el resultado de un partido marcado como 'jugado'.")
+        return False
 
-        if horas_transcurridas > 48:
-            print(f"\n✗ RESTRICCIÓN DE SEGURIDAD (PLAZO 48 HORAS EXPIRADO):")
-            print(f"  El resultado solo es modificable durante las 48 horas posteriores a disputarse el partido.")
-            print(f"  Fecha de juego: {dt_fin.strftime('%d/%m/%Y %H:%M')}")
-            print(f"  Han transcurrido {horas_transcurridas:.1f} horas desde que finalizó (Límite máximo: 48 horas).")
-            return False
+    dt_fin = parse_fecha_hora(p_dia, hora_fin)
+    ahora = datetime.now()
+    if ahora < dt_fin:
+        print("✗ El turno del partido todavía no ha finalizado.")
+        return False
+
+    horas_transcurridas = (ahora - dt_fin).total_seconds() / 3600.0
+    if horas_transcurridas > 48:
+        print("\n✗ RESTRICCIÓN DE SEGURIDAD (PLAZO 48 HORAS EXPIRADO):")
+        print("  El resultado solo es modificable durante las 48 horas posteriores al fin programado del turno.")
+        print(f"  Fin programado: {dt_fin.strftime('%d/%m/%Y %H:%M')}")
+        print(f"  Han transcurrido {horas_transcurridas:.1f} horas (límite máximo: 48 horas).")
+        return False
 
     return True
 
@@ -1447,6 +1454,73 @@ def planillero_registrar_gol(conexion):
                  "Gol registrado exitosamente.")
 
 
+def planillero_seleccionar_gol(conexion, id_partido, id_torneo):
+    sql = """
+        SELECT id_gol, ci_jugador, minuto, autogol
+        FROM gol
+        WHERE id_partido = %s AND id_torneo = %s
+        ORDER BY id_gol
+    """
+    _, goles = ejecutar_consulta(conexion, sql, (id_partido, id_torneo))
+    if not goles:
+        print("No hay goles registrados para ese partido.")
+        return None
+
+    print("\nGoles registrados:")
+    for id_gol, ci_jugador, minuto, autogol in goles:
+        print(f"  Gol {id_gol}: jugador {ci_jugador}, minuto {minuto}, autogol: {'sí' if autogol else 'no'}")
+
+    id_gol = pedir_entero("ID Gol")
+    if id_gol not in [gol[0] for gol in goles]:
+        print("✗ El gol indicado no pertenece a ese partido.")
+        return None
+    return id_gol
+
+
+def planillero_modificar_gol(conexion):
+    imprimir_subtitulo("MODIFICAR GOL")
+    id_partido = pedir_entero("ID Partido")
+    id_torneo = pedir_entero("ID Torneo")
+    if not verificar_resultado_es_modificable(conexion, id_partido, id_torneo):
+        return
+
+    id_gol = planillero_seleccionar_gol(conexion, id_partido, id_torneo)
+    if id_gol is None:
+        return
+
+    ci_jugador = pedir_ci("CI Jugador que convirtió (8 dígitos)")
+    minuto = pedir_entero("Minuto del gol", minimo=0)
+    auto_opc = pedir_opcion("¿Fue autogol?", ["si", "no"])
+    autogol = auto_opc == "si"
+
+    sql = """
+        UPDATE gol
+        SET ci_jugador = %s, minuto = %s, autogol = %s
+        WHERE id_gol = %s AND id_partido = %s AND id_torneo = %s
+    """
+    ejecutar_dml(conexion, sql, (ci_jugador, minuto, autogol, id_gol, id_partido, id_torneo),
+                 "Gol actualizado exitosamente.")
+
+
+def planillero_eliminar_gol(conexion):
+    imprimir_subtitulo("ELIMINAR GOL")
+    id_partido = pedir_entero("ID Partido")
+    id_torneo = pedir_entero("ID Torneo")
+    if not verificar_resultado_es_modificable(conexion, id_partido, id_torneo):
+        return
+
+    id_gol = planillero_seleccionar_gol(conexion, id_partido, id_torneo)
+    if id_gol is None:
+        return
+
+    sql = """
+        DELETE FROM gol
+        WHERE id_gol = %s AND id_partido = %s AND id_torneo = %s
+    """
+    ejecutar_dml(conexion, sql, (id_gol, id_partido, id_torneo),
+                 "Gol eliminado exitosamente.")
+
+
 def planillero_registrar_tarjeta(conexion):
     imprimir_subtitulo("REGISTRAR TARJETA")
     id_partido = pedir_entero("ID Partido")
@@ -1524,6 +1598,8 @@ def menu_planillero(conexion, usuario):
         print("5. Finalizar Partido (Solo si ya pasó la fecha y hora)")
         print("6. Consultar Partidos")
         print("7. Consultar Tabla de Posiciones por Edición")
+        print("8. Modificar Gol (Dentro de las 48 horas)")
+        print("9. Eliminar Gol (Dentro de las 48 horas)")
         print("0. Cerrar Sesión")
 
         opc = input("\nSeleccione una opción: ").strip()
@@ -1542,6 +1618,10 @@ def menu_planillero(conexion, usuario):
             planillero_consultar_partidos(conexion)
         elif opc == "7":
             consultar_tabla_posiciones(conexion)
+        elif opc == "8":
+            planillero_modificar_gol(conexion)
+        elif opc == "9":
+            planillero_eliminar_gol(conexion)
         elif opc == "0":
             print("\nCerrando sesión de Planillero...")
             break
