@@ -6,6 +6,16 @@
 ================================================================================
 Integrantes: Lara Canío y Aileen Waller
 
+Aclaraciones:
+El código fue realizado por Antigravity pero con las idicaciones que nosotras le fuimos dando.
+A medida que se iba generando el código lo fuimos revisando y modificando para que cumpla con la
+consigna correctamente, para que los cálculos funcionen y devuelvan lo esperado, y aprovechamos
+que la IA es mucho más eficiente que un programador promedio para generar el código (además
+considerando que no somos expertas tituladas en programación y que lógicamente programar todo
+esto a mano, corregirlo y revisarlo nos habría llevado semanas). Obviamente esto no significa que
+no entendamos el código. Lo entendemos a la perfección dadas las constantes correcciones que le
+fuimos haciendo y esperamos demostrarlo en la defensa oral del proyecto.
+
 Módulos y Roles implementados:
   1. Administrador:
      - Alta, Baja y Modificación de Jugadores (Validación CI de 8 dígitos y fecha MySQL)
@@ -35,6 +45,7 @@ SEGURIDAD Y PROTECCIÓN:
 ================================================================================
 """
 
+import os
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime, timedelta, time, date
@@ -43,10 +54,11 @@ from datetime import datetime, timedelta, time, date
 # CONFIGURACIÓN DE CONEXIÓN A LA BASE DE DATOS
 # ==============================================================================
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "",  # Contraseña configurada
-    "database": "obligatorio"
+    "host": os.environ.get("DB_HOST", "localhost"),
+    "port": int(os.environ.get("DB_PORT", 3306)),
+    "user": os.environ.get("DB_USER", "root"),
+    "password": os.environ.get("DB_PASSWORD", "Luc14n4.C0l37151107"),
+    "database": os.environ.get("DB_NAME", "obligatorio")
 }
 
 
@@ -702,6 +714,58 @@ def admin_alta_partido(conexion):
             break
         print("  -> Error: El equipo local debe ser distinto al equipo visitante.")
 
+    # REGLAS DEL TORNEO (PDF PÁGS. 1-2):
+    # 1. Ambos equipos deben pertenecer a la misma edición del torneo
+    sql_check_et = "SELECT id_equipo FROM equipo_torneo WHERE id_torneo = %s AND id_equipo = %s"
+    _, r_loc = ejecutar_consulta(conexion, sql_check_et, (id_torneo, id_local))
+    if not r_loc:
+        print(f"✗ El equipo local ({id_local}) no está inscripto en la edición {id_torneo} del torneo.")
+        return
+
+    _, r_vis = ejecutar_consulta(conexion, sql_check_et, (id_torneo, id_visitante))
+    if not r_vis:
+        print(f"✗ El equipo visitante ({id_visitante}) no está inscripto en la edición {id_torneo} del torneo.")
+        return
+
+    # 2. Ambos equipos deben tener al menos 5 jugadores en su plantel
+    sql_check_min = "SELECT COUNT(*) FROM equipo_jugador_torneo WHERE id_torneo = %s AND id_equipo = %s"
+    _, r_c_loc = ejecutar_consulta(conexion, sql_check_min, (id_torneo, id_local))
+    cant_loc = r_c_loc[0][0] if r_c_loc else 0
+    if cant_loc < 5:
+        print(f"✗ El equipo local ({id_local}) tiene {cant_loc} jugadores en su plantel (mínimo reglamentario: 5).")
+        return
+
+    _, r_c_vis = ejecutar_consulta(conexion, sql_check_min, (id_torneo, id_visitante))
+    cant_vis = r_c_vis[0][0] if r_c_vis else 0
+    if cant_vis < 5:
+        print(f"✗ El equipo visitante ({id_visitante}) tiene {cant_vis} jugadores en su plantel (mínimo reglamentario: 5).")
+        return
+
+    # 3. Ningún equipo juegue más de un partido en la misma fecha del torneo
+    sql_fecha = """
+        SELECT id_partido FROM partido
+        WHERE id_torneo = %s AND numero_fecha = %s
+          AND (id_equipo_local IN (%s, %s) OR id_equipo_visitante IN (%s, %s))
+          AND estado != 'postergado'
+    """
+    _, r_f = ejecutar_consulta(conexion, sql_fecha, (id_torneo, nro_fecha, id_local, id_visitante, id_local, id_visitante))
+    if r_f:
+        print(f"✗ Conflicto de fixture: Uno de los equipos ya tiene un partido programado en la fecha N° {nro_fecha} de este torneo.")
+        return
+
+    # 4. No se enfrenten dos veces en la misma edición (liga a una sola rueda), salvo postergado
+    sql_duelo = """
+        SELECT id_partido, estado FROM partido
+        WHERE id_torneo = %s
+          AND ((id_equipo_local = %s AND id_equipo_visitante = %s)
+            OR (id_equipo_local = %s AND id_equipo_visitante = %s))
+          AND estado != 'postergado'
+    """
+    _, r_d = ejecutar_consulta(conexion, sql_duelo, (id_torneo, id_local, id_visitante, id_visitante, id_local))
+    if r_d:
+        print("✗ Ambos equipos ya tienen un partido registrado entre sí en esta edición del torneo (liga a una sola rueda).")
+        return
+
     dia = pedir_fecha("Día del encuentro")
 
     # Confirmar que el turno exista
@@ -994,24 +1058,139 @@ def menu_gestion_planteles(conexion):
             break
 
 
+def consultar_tabla_posiciones(conexion, id_torneo=None):
+    """
+    Muestra la Tabla de Posiciones oficial según la edición del torneo seleccionada.
+    Considera:
+      - PJ: Partidos Jugados
+      - PG: Partidos Ganados (3 puntos c/u)
+      - PE: Partidos Empatados (1 punto c/u)
+      - PP: Partidos Perdidos (0 puntos c/u)
+      - GF: Goles a Favor
+      - GC: Goles en Contra
+      - DG: Diferencia de Goles (GF - GC)
+      - Pts: Puntos totales obtenidos
+    Criterio de ordenación oficial:
+      1° Puntos (Pts DESC)
+      2° Diferencia de Goles (DG DESC)
+      3° Goles a Favor (GF DESC)
+      4° Nombre del Equipo (Equipo ASC)
+    """
+    imprimir_subtitulo("TABLA DE POSICIONES OFICIAL POR EDICIÓN DEL TORNEO")
+
+    if id_torneo is None:
+        sql_torneos = "SELECT id_torneo, nombre, año, semestre, estado FROM torneo ORDER BY id_torneo"
+        _, torneos = ejecutar_consulta(conexion, sql_torneos)
+        if not torneos:
+            print("✗ No se encontraron ediciones de torneo registradas.")
+            return
+
+        print("\nEdiciones de Torneo disponibles:")
+        for t_id, t_nom, t_anio, t_sem, t_est in torneos:
+            print(f"  Torneo ID [{t_id}]: {t_nom} ({t_anio} - Semestre {t_sem}) [Estado: {t_est}]")
+
+        id_torneo = pedir_entero("Ingrese el ID del Torneo a consultar", sugerido=torneos[0][0])
+
+    # Consultar datos informativos del torneo
+    sql_info = "SELECT nombre, año, semestre, estado FROM torneo WHERE id_torneo = %s"
+    _, t_info = ejecutar_consulta(conexion, sql_info, (id_torneo,))
+    if not t_info:
+        print("✗ Torneo no encontrado.")
+        return
+
+    nom_torneo, anio_t, sem_t, est_t = t_info[0]
+
+    # Consulta oficial de tabla de posiciones basada en DataGrip.sql
+    sql_tabla = """
+        SELECT e.nombre AS equipo,
+               COUNT(r.id_partido) AS pj,
+               COUNT(CASE WHEN r.goles_favor > r.goles_contra THEN 1 END) AS pg,
+               COUNT(CASE WHEN r.goles_favor = r.goles_contra THEN 1 END) AS pe,
+               COUNT(CASE WHEN r.goles_favor < r.goles_contra THEN 1 END) AS pp,
+               COALESCE(SUM(r.goles_favor), 0) AS gf,
+               COALESCE(SUM(r.goles_contra), 0) AS gc,
+               COALESCE(SUM(r.goles_favor) - SUM(r.goles_contra), 0) AS dg,
+               COALESCE(SUM(CASE
+                       WHEN r.goles_favor > r.goles_contra THEN 3
+                       WHEN r.goles_favor = r.goles_contra THEN 1
+                       ELSE 0
+                   END), 0) AS pts
+        FROM equipo_torneo et
+        JOIN torneo t ON t.id_torneo = et.id_torneo
+        JOIN equipo e ON e.id_equipo = et.id_equipo
+        LEFT JOIN (
+            SELECT p.id_torneo, p.id_partido, et.id_equipo,
+                   COUNT(CASE
+                             WHEN (g.autogol = FALSE AND pp.id_equipo = et.id_equipo)
+                               OR (g.autogol = TRUE AND (
+                                      (et.id_equipo = p.id_equipo_local AND pp.id_equipo = p.id_equipo_visitante)
+                                   OR (et.id_equipo = p.id_equipo_visitante AND pp.id_equipo = p.id_equipo_local)
+                               ))
+                             THEN 1
+                         END) AS goles_favor,
+                   COUNT(CASE
+                             WHEN (g.autogol = FALSE AND (
+                                      (et.id_equipo = p.id_equipo_local AND pp.id_equipo = p.id_equipo_visitante)
+                                   OR (et.id_equipo = p.id_equipo_visitante AND pp.id_equipo = p.id_equipo_local)
+                               ))
+                               OR (g.autogol = TRUE AND pp.id_equipo = et.id_equipo)
+                             THEN 1
+                         END) AS goles_contra
+            FROM partido p
+            JOIN equipo_torneo et
+                ON et.id_torneo = p.id_torneo
+                AND (et.id_equipo = p.id_equipo_local OR et.id_equipo = p.id_equipo_visitante)
+            LEFT JOIN gol g
+                ON g.id_partido = p.id_partido
+                AND g.id_torneo = p.id_torneo
+            LEFT JOIN planilla_partido pp
+                ON pp.id_partido = g.id_partido
+               AND pp.id_torneo = g.id_torneo
+               AND pp.ci_jugador = g.ci_jugador
+            WHERE p.estado = 'jugado'
+            GROUP BY p.id_torneo, p.id_partido, et.id_equipo
+        ) r
+            ON r.id_torneo = et.id_torneo
+           AND r.id_equipo = et.id_equipo
+        WHERE et.id_torneo = %s
+        GROUP BY t.id_torneo, t.nombre, e.id_equipo, e.nombre
+        ORDER BY pts DESC, dg DESC, gf DESC, e.nombre ASC
+    """
+    _, filas = ejecutar_consulta(conexion, sql_tabla, (id_torneo,))
+
+    print(f"\n--- {nom_torneo} ({anio_t} - Semestre {sem_t}) | Estado: {est_t.upper()} ---")
+    headers = ["Pos.", "Equipo", "PJ", "PG", "PE", "PP", "GF", "GC", "DG", "Pts"]
+    filas_pos = []
+    for idx, r in enumerate(filas, 1):
+        filas_pos.append([f"{idx}°", r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]])
+
+    imprimir_tabla(headers, filas_pos)
+    print("Reglamento de puntuación: Victoria = 3 pts | Empate = 1 pto | Derrota = 0 pts")
+    print("Criterio de desempate: 1° Puntos -> 2° Diferencia de Goles -> 3° Goles a Favor -> 4° Alfabético")
+
+
 def submenu_reportes(conexion):
     while True:
         imprimir_subtitulo("REPORTES Y ESTADÍSTICAS OFICIALES")
-        print("1. Cantidad de jugadores por facultad")
-        print("2. Cantidad de jugadores por tipo (grado, posgrado, docente, etc.)")
-        print("3. Top 10 Máximos Goleadores")
-        print("4. Jugadores sin minutos (que no figuran en ninguna planilla)")
-        print("5. Canchas más utilizadas")
-        print("6. Turnos más solicitados")
-        print("7. Promedio de goles por fecha y por torneo")
-        print("8. Porcentaje de partidos jugados vs. postergados")
-        print("9. Tabla Fair Play de equipos")
-        print("10. Ranking de sanciones y tarjetas")
+        print("1. Tabla de Posiciones por Edición del Torneo")
+        print("2. Cantidad de jugadores por facultad")
+        print("3. Cantidad de jugadores por tipo (grado, posgrado, docente, etc.)")
+        print("4. Top 10 Máximos Goleadores")
+        print("5. Jugadores sin minutos (que no figuran en ninguna planilla)")
+        print("6. Canchas más utilizadas")
+        print("7. Turnos más solicitados")
+        print("8. Promedio de goles por fecha y por torneo")
+        print("9. Porcentaje de partidos jugados vs. postergados")
+        print("10. Tabla Fair Play de equipos")
+        print("11. Ranking de sanciones y tarjetas")
         print("0. Volver")
 
         opc = input("Seleccione un reporte: ").strip()
 
         if opc == "1":
+            consultar_tabla_posiciones(conexion)
+
+        elif opc == "2":
             sql = """
                 SELECT f.nombre AS Facultad, COUNT(*) AS Cantidad_Jugadores
                 FROM facultad f
@@ -1022,12 +1201,12 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "2":
+        elif opc == "3":
             sql = "SELECT tipo AS 'Tipo de Integrante', COUNT(*) AS Cantidad FROM jugador GROUP BY tipo ORDER BY Cantidad DESC"
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "3":
+        elif opc == "4":
             sql = """
                 SELECT j.ci AS CI, j.nombre AS Nombre, j.apellido AS Apellido, COUNT(*) AS Goles
                 FROM gol g
@@ -1040,7 +1219,7 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "4":
+        elif opc == "5":
             sql = """
                 SELECT j.ci AS CI, j.nombre AS Nombre, j.apellido AS Apellido, f.nombre AS Facultad
                 FROM jugador j
@@ -1054,7 +1233,7 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "5":
+        elif opc == "6":
             sql = """
                 SELECT nombre_cancha AS Cancha, COUNT(*) AS Cantidad_Usos
                 FROM partido
@@ -1065,7 +1244,7 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "6":
+        elif opc == "7":
             sql = """
                 SELECT t.id_turno AS 'ID Turno', t.hora_inicio AS Inicio, t.hora_fin AS Fin,
                        COUNT(*) AS Cantidad_Partidos
@@ -1078,7 +1257,7 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "7":
+        elif opc == "8":
             print("\n--- Promedio de Goles por Fecha ---")
             sql_fechas = """
                 SELECT p.numero_fecha AS Fecha,
@@ -1102,7 +1281,7 @@ def submenu_reportes(conexion):
             h2, r2 = ejecutar_consulta(conexion, sql_gral)
             imprimir_tabla(h2, r2)
 
-        elif opc == "8":
+        elif opc == "9":
             sql = """
                 SELECT
                     ROUND(SUM(CASE WHEN estado = 'jugado' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS Porcentaje_Jugados,
@@ -1113,7 +1292,7 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "9":
+        elif opc == "10":
             sql = """
                 SELECT e.nombre AS Equipo,
                        SUM(CASE WHEN t.color IN ('amarilla', 'amarillo') THEN 1
@@ -1127,18 +1306,44 @@ def submenu_reportes(conexion):
             headers, rows = ejecutar_consulta(conexion, sql)
             imprimir_tabla(headers, rows)
 
-        elif opc == "10":
+        elif opc == "11":
+            print("\n--- Top 10 Jugadores con más Sanciones ---")
             sql_sanc = """
                 SELECT j.ci AS CI, j.nombre AS Nombre, j.apellido AS Apellido, COUNT(*) AS Cantidad_Sanciones
                 FROM sancion_jugador s
                 JOIN jugador j ON s.ci_jugador = j.ci
                 GROUP BY j.ci, j.nombre, j.apellido
                 ORDER BY Cantidad_Sanciones DESC
-                LIMIT 5
+                LIMIT 10
             """
             h, r = ejecutar_consulta(conexion, sql_sanc)
-            print("\n--- Top Jugadores con más Sanciones ---")
             imprimir_tabla(h, r)
+
+            print("\n--- Top 3 Facultades con más Goles ---")
+            sql_fac = """
+                SELECT f.nombre AS Facultad, COUNT(*) AS Total_Goles
+                FROM gol g
+                JOIN jugador j ON g.ci_jugador = j.ci
+                JOIN facultad f ON j.id_facultad = f.id_facultad
+                WHERE g.autogol = FALSE
+                GROUP BY f.id_facultad, f.nombre
+                ORDER BY Total_Goles DESC
+                LIMIT 3
+            """
+            h_f, r_f = ejecutar_consulta(conexion, sql_fac)
+            imprimir_tabla(h_f, r_f)
+
+            print("\n--- Jugador con más Tarjetas ---")
+            sql_tarj = """
+                SELECT j.ci AS CI, j.nombre AS Nombre, j.apellido AS Apellido, COUNT(*) AS Cantidad_Tarjetas
+                FROM tarjeta t
+                JOIN jugador j ON t.ci_jugador = j.ci
+                GROUP BY j.ci, j.nombre, j.apellido
+                ORDER BY Cantidad_Tarjetas DESC
+                LIMIT 1
+            """
+            h_t, r_t = ejecutar_consulta(conexion, sql_tarj)
+            imprimir_tabla(h_t, r_t)
 
         elif opc == "0":
             break
@@ -1302,6 +1507,7 @@ def menu_planillero(conexion, usuario):
         print("4. Registrar Capitán de Partido")
         print("5. Finalizar Partido (Solo si ya pasó la fecha y hora)")
         print("6. Consultar Partidos")
+        print("7. Consultar Tabla de Posiciones por Edición")
         print("0. Cerrar Sesión")
 
         opc = input("\nSeleccione una opción: ").strip()
@@ -1318,6 +1524,8 @@ def menu_planillero(conexion, usuario):
             planillero_finalizar_partido(conexion)
         elif opc == "6":
             planillero_consultar_partidos(conexion)
+        elif opc == "7":
+            consultar_tabla_posiciones(conexion)
         elif opc == "0":
             print("\nCerrando sesión de Planillero...")
             break
@@ -1448,21 +1656,24 @@ def jugador_consultar_sanciones(conexion):
 def menu_jugador(conexion, usuario):
     while True:
         imprimir_titulo(f"PANEL DEL JUGADOR ({usuario}) - MODO CONSULTA")
-        print("1. Consultar Partidos (Lista completa desde jugados hasta programados)")
-        print("2. Consultar Goles")
-        print("3. Consultar Tarjetas")
-        print("4. Consultar Sanciones")
+        print("1. Consultar Tabla de Posiciones por Edición del Torneo")
+        print("2. Consultar Partidos (Lista completa desde jugados hasta programados)")
+        print("3. Consultar Goles")
+        print("4. Consultar Tarjetas")
+        print("5. Consultar Sanciones")
         print("0. Cerrar Sesión")
 
         opc = input("\nSeleccione una opción: ").strip()
 
         if opc == "1":
-            jugador_consultar_partidos(conexion)
+            consultar_tabla_posiciones(conexion)
         elif opc == "2":
-            jugador_consultar_goles(conexion)
+            jugador_consultar_partidos(conexion)
         elif opc == "3":
-            jugador_consultar_tarjetas(conexion)
+            jugador_consultar_goles(conexion)
         elif opc == "4":
+            jugador_consultar_tarjetas(conexion)
+        elif opc == "5":
             jugador_consultar_sanciones(conexion)
         elif opc == "0":
             print("\nCerrando sesión de Jugador...")
