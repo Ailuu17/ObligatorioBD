@@ -11,7 +11,7 @@ El código fue realizado por Antigravity pero con las idicaciones que nosotras l
 A medida que se iba generando el código lo fuimos revisando y modificando para que cumpla con la
 consigna correctamente, para que los cálculos funcionen y devuelvan lo esperado, y aprovechamos
 que la IA es mucho más eficiente que un programador promedio para generar el código (además
-considerando que no somos expertas tituladas en programación y que lógicamente programar todo
+considerando que no tenemos conocimientos avanzados de programación y que lógicamente programar todo
 esto a mano, corregirlo y revisarlo nos habría llevado semanas). Obviamente esto no significa que
 no entendamos el código. Lo entendemos a la perfección dadas las constantes correcciones que le
 fuimos haciendo y esperamos demostrarlo en la defensa oral del proyecto.

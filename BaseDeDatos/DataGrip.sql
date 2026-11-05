@@ -1102,7 +1102,7 @@ ORDER BY puntaje_fair_play ASC;
 
 
 -- 9: Tabla de posiciones por edición del torneo
--- Para esta consulta, como había que juntar muchísimos datos, hicimos las partes de las consultas sueltas y con ayuda de la IA las fuimos juntando para que funcione correctamente.
+-- Como había que juntar muchísimos datos, hicimos las partes de las consultas sueltas y con ayuda de la IA las fuimos juntando para que funcione correctamente.
 -- Asumimos como puntaje: 3 por victoria, 1 por empate y 0 por derrota.
 -- La posicion de cada equipo se determina por el orden de las filas.
 SELECT t.nombre AS torneo, t.año, t.semestre, e.nombre AS equipo,
