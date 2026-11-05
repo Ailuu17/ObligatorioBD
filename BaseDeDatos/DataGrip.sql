@@ -448,7 +448,7 @@ BEGIN
     DECLARE fecha_partido INT;
     DECLARE cantidad INT;
 
-    SELECT numero_fecha →
+    SELECT numero_fecha
     INTO fecha_partido
     FROM partido
     WHERE id_partido = NEW.id_partido
