@@ -308,4 +308,4 @@ El repositorio incluye:
 - Datos iniciales.
 - Informe.
 - Bitácora del trabajo.
-- Manual de instalación y ejecución.
+- Manual de uso y ejecución local (Docs/Manual%20de%20uso.md).
