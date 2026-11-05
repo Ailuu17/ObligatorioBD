@@ -160,7 +160,7 @@ Create table tarjeta(
 );
 
 Create table sancion_jugador(
-    id_sancion INT PRIMARY KEY,
+    id_sancion INT AUTO_INCREMENT PRIMARY KEY,
     ci_jugador INT NOT NULL,
     id_torneo INT NOT NULL,
     motivo VARCHAR(25) NOT NULL,
@@ -1103,6 +1103,55 @@ END;//
 
 DELIMITER ;
 
+DELIMITER //
+
+CREATE TRIGGER trigger_sancion_automatica_tarjeta
+AFTER INSERT
+ON tarjeta
+FOR EACH ROW
+BEGIN
+
+    DECLARE fecha_sancion INT;
+    DECLARE cantidad_amarillas INT;
+
+    SELECT numero_fecha
+    INTO fecha_sancion
+    FROM partido
+    WHERE id_partido = NEW.id_partido
+      AND id_torneo = NEW.id_torneo;
+
+    IF NEW.color IN ('roja', 'rojo') THEN
+        INSERT INTO sancion_jugador (
+            ci_jugador, id_torneo, motivo, numero_fecha_sancion,
+            numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+        )
+        VALUES (
+            NEW.ci_jugador, NEW.id_torneo, 'roja',
+            fecha_sancion, fecha_sancion + 1, 1
+        );
+    ELSEIF NEW.color IN ('amarilla', 'amarillo') THEN
+        SELECT COUNT(*)
+        INTO cantidad_amarillas
+        FROM tarjeta
+        WHERE ci_jugador = NEW.ci_jugador
+          AND id_torneo = NEW.id_torneo
+          AND color IN ('amarilla', 'amarillo');
+
+        IF MOD(cantidad_amarillas, 3) = 0 THEN
+            INSERT INTO sancion_jugador (
+                ci_jugador, id_torneo, motivo, numero_fecha_sancion,
+                numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+            )
+            VALUES (
+                NEW.ci_jugador, NEW.id_torneo, 'acumulación de amarillas',
+                fecha_sancion, fecha_sancion + 1, 1
+            );
+        END IF;
+    END IF;
+
+END;//
+
+DELIMITER ;
 
 -- Realizamos las consultas que se pedían 
 

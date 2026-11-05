@@ -92,8 +92,8 @@ Puede consultar la tabla de posiciones, partidos, goles, tarjetas y sanciones.
 ### Gestión de Sanciones
 
 - La administración puede registrar, modificar, eliminar y consultar sanciones.
-- Las sanciones por tarjeta roja o acumulación de amarillas no se generan
-  automáticamente; deben registrarse desde la gestión de sanciones.
+- Un trigger MySQL genera automáticamente una suspensión de una fecha por tarjeta roja y por cada grupo de tres amarillas acumuladas en el torneo (3, 6, 9, ...). 
+- Si varias sanciones corresponden a la misma fecha, coinciden en esa fecha; no se acumulan en fechas consecutivas.
 - Al agregar un jugador a una planilla, MySQL verifica que no esté suspendido.
 
 ### Reportes

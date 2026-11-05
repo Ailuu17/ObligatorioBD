@@ -80,7 +80,7 @@ El menú de administración puede agrupar las opciones de la siguiente manera:
 - **Equipos y planteles:** crear equipos, inscribirlos en una edición, asignar capitán, agregar jugadores y números de camiseta.
 - **Complejos, canchas y turnos:** registrar los lugares y franjas horarias disponibles para programar partidos.
 - **Fixture y partidos:** crear y consultar fechas, equipos participantes, cancha, turno y estado del partido.
-- **Sanciones:** registrar, modificar, eliminar y consultar sanciones. Las sanciones por tarjeta roja o acumulación de amarillas no se generan automáticamente; el administrador debe registrarlas.
+- **Sanciones:** consultar y gestionar sanciones. MySQL genera automáticamente una suspensión de una fecha por tarjeta roja y por cada grupo de tres amarillas acumuladas en el torneo; las sanciones disciplinarias siguen siendo registradas por el administrador.
 - **Reportes:** elegir una consulta, indicar los filtros disponibles (por ejemplo, edición o fecha) y revisar los resultados en pantalla.
 
 #### Orden sugerido para crear una nueva edición
@@ -111,9 +111,10 @@ Si el partido ya está marcado como jugado, el planillero puede modificar o elim
 
 ### 7. Sanciones y reglas de los torneos
 
-- Las sanciones por tarjeta roja o acumulación de amarillas deben ser registradas manualmente por el administrador; el sistema no las genera automáticamente.
+- Una tarjeta roja genera una suspensión de una fecha, y cada grupo de tres amarillas acumuladas en el torneo genera otra suspensión de una fecha. El conteo no se reinicia al cumplir una suspensión: se genera una nueva al llegar a 3, 6, 9, etc.
+- La suspensión comienza en la fecha siguiente a la que corresponde la tarjeta. Si varias sanciones comienzan en la misma fecha, coinciden en esa fecha y no se trasladan a fechas consecutivas.
 - Un jugador con una sanción vigente no puede incluirse en la planilla de un partido comprendido por esa sanción.
-- La organización puede registrar sanciones disciplinarias de varias fechas.
+- El administrador registra manualmente las sanciones disciplinarias y puede ajustar una sanción si se corrige una tarjeta directamente en la base de datos. El sistema no recalcula automáticamente sanciones ante correcciones o eliminaciones manuales de tarjetas.
 - Un partido solo puede marcarse como jugado una vez que su día y turno hayan pasado.
 - Un partido jugado no se puede eliminar. La corrección de su resultado está limitada a las 48 horas posteriores al fin programado del turno.
 - Una vez que el partido está jugado, no se puede cambiar su estado, fecha ni turno.
