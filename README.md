@@ -202,15 +202,12 @@ ObligatorioBD/
 
 ## Seguridad
 
-La aplicación y la base de datos contemplan:
+Esta versión es académica por lo que tiene ciertas limitaciones de seguridad:
 
-- Consultas SQL parametrizadas en el programa.
-- Restricciones de integridad y disparadores MySQL.
-- Menús de la aplicación diferenciados según el rol validado en la tabla `login`.
-- El script SQL define cuentas MySQL con permisos distintos para sus roles.
-
-Las credenciales incluidas en el script son de ejemplo y deben cambiarse antes
-de usar o compartir el sistema fuera de un entorno de prueba.
+- Las contraseñas de aplicación se almacenan en texto en `login` y se comparan directamente; no se guardan hashes.
+- El código incluye un valor por defecto para la contraseña de conexión a MySQL, y la configuración usa `root` por defecto. Las contraseñas escritas en la consola tampoco se ocultan.
+- El script SQL contiene credenciales fijas de ejemplo para cuentas MySQL y de aplicación. 
+- El programa mantiene una única conexión MySQL para todos los usuarios de aplicación. El rol autenticado limita el menú mostrado, pero no cambia la cuenta MySQL. Los `GRANT` solo se aplican según el usuario configurado en `DB_USER`, no según el rol de aplicación.
 
 ---
 

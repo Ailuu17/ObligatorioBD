@@ -45,6 +45,12 @@ $env:DB_PASSWORD = "<contraseña MySQL>"
 
 El script SQL contiene credenciales de ejemplo para sus cuentas de base de datos. Cámbielas antes de compartir o utilizar el sistema fuera de un entorno de prueba y no reutilice contraseñas de ejemplo.
 
+#### Advertencia de seguridad
+
+Esta versión es académica, las contraseñas de aplicación se almacenan en texto y se comparan directamente; el código también contiene un valor por defecto para la conexión a MySQL, que usa `root` si no se configura otra cuenta. Las contraseñas ingresadas en la consola no se ocultan.
+
+La aplicación mantiene una sola conexión MySQL para todos los usuarios. El rol autenticado controla el menú, pero no cambia la cuenta MySQL utilizada; por eso los permisos `GRANT` se aplican según `DB_USER`, no según el rol de aplicación.
+
 #### Iniciar el programa
 
 Desde PowerShell, ubicado en la carpeta raíz del proyecto:
