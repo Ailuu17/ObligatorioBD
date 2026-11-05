@@ -18,30 +18,14 @@ La solución busca reemplazar el uso de planillas de cálculo y grupos de mensaj
 - Organizar el fixture y programación de partidos.
 - Registrar planillas de juego.
 - Registrar goles y tarjetas.
-- Gestionar sanciones automáticas y disciplinarias.
+- Administrar sanciones disciplinarias y suspensiones registradas.
 - Generar reportes estadísticos para la organización del torneo.
 
 ---
 
 ## Arquitectura
 
-### Backend
-- Python
-- API REST
-
-### Base de Datos
-- MySQL
-
-### Frontend
-- (Falta elegir)
-
-### Herramientas
-- Git
-- GitHub
-- Docker 
-- Docker Compose 
-
-> La consigna no permite utilizar ORM.
+La solución implementada es una aplicación interactiva de consola escrita en Python, conectada directamente a MySQL mediante `mysql-connector-python` y consultas SQL. No incluye una interfaz web ni ORM (ya que la letra no lo permitía).
 
 ---
 
@@ -64,9 +48,13 @@ Puede:
 
 - Registrar planillas de partido.
 - Registrar goles.
+- Corregir o eliminar goles dentro del plazo permitido.
 - Registrar tarjetas.
+- Registrar capitanes y marcar partidos como jugados.
+- Consultar partidos y la tabla de posiciones.
 
-No posee permisos de administración general.
+### Jugador
+Puede consultar la tabla de posiciones, partidos, goles, tarjetas y sanciones.
 
 ---
 
@@ -76,8 +64,8 @@ No posee permisos de administración general.
 
 - Alta de jugadores.
 - Modificación de datos.
-- Baja lógica o física (según implementación).
-- Asociación a facultades.
+- Baja y consulta de jugadores.
+- Asociación a una facultad existente.
 
 ### Gestión de Equipos
 
@@ -103,9 +91,10 @@ No posee permisos de administración general.
 
 ### Gestión de Sanciones
 
-- Suspensiones por tarjeta roja.
-- Suspensiones por acumulación de amarillas.
-- Sanciones disciplinarias definidas por la organización.
+- La administración puede registrar, modificar, eliminar y consultar sanciones.
+- Las sanciones por tarjeta roja o acumulación de amarillas no se generan
+  automáticamente; deben registrarse desde la gestión de sanciones.
+- Al agregar un jugador a una planilla, MySQL verifica que no esté suspendido.
 
 ### Reportes
 
@@ -147,129 +136,65 @@ Definidas según el modelo propuesto en la consigna.
 
 ## Instalación y ejecución
 
-### 1. Clonar el repositorio
-
-```bash
-git clone https://github.com/usuario/repositorio.git
-cd repositorio
-```
-
-### 2. Crear la base de datos
-
-```sql
-CREATE DATABASE torneo_interfacultades;
-```
-
-### 3. Ejecutar scripts SQL
-
-```bash
-/database/schema.sql
-/database/data.sql
-```
-
-### 4. Configurar variables de entorno
-
-Crear archivo `.env`
-
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=torneo_interfacultades
-DB_USER=root
-DB_PASSWORD=password
-```
-
-### 5. Instalar dependencias
-
-```bash
-pip install -r requirements.txt
-```
-
-### 6. Ejecutar la aplicación
-
-```bash
-python app.py
-```
-
----
-
-## Dockerización (base inicial)
-
-La carpeta `Dockerización` contiene una configuración inicial para ejecutar el
-backend Python junto con MySQL. Como `Backend/Backend.py` aún no tiene código,
-el contenedor del backend terminará enseguida; el comando de inicio y el puerto
-se ajustarán cuando la API esté implementada.
-
 ### Requisitos
 
-- Docker Desktop instalado y abierto.
-- Ejecutar los comandos desde la carpeta principal del repositorio.
+- Python 3.
+- MySQL en ejecución.
+- Una cuenta MySQL con permisos suficientes para crear la base y ejecutar el script.
 
-### Preparar y arrancar
+### Instalar la dependencia
 
-En PowerShell, copia el archivo de ejemplo:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Edita `.env` y cambia las contraseñas de ejemplo. Luego construye la imagen e
-inicia los servicios:
+Desde PowerShell, en la carpeta raíz del proyecto:
 
 ```powershell
-docker compose -f Dockerización/docker-compose.yml up --build -d
+python -m pip install mysql-connector-python
 ```
 
-Para ver los mensajes de los contenedores:
+### Crear la base y los datos de prueba
+
+Abra `BaseDeDatos/DataGrip.sql` en MySQL Workbench, DataGrip u otra herramienta
+compatible y ejecute el script completo sobre una instalación limpia. El script
+crea la base `obligatorio`, las tablas, restricciones, disparadores, cuentas y
+datos de ejemplo. No lo vuelva a ejecutar sobre una base que quiera conservar.
+
+### Configurar la conexión
+
+El programa lee las variables de entorno del proceso; no carga un archivo
+`.env` automáticamente. En PowerShell, defínalas antes de iniciar el programa:
 
 ```powershell
-docker compose -f Dockerización/docker-compose.yml logs -f
+$env:DB_HOST = "localhost"
+$env:DB_PORT = "3306"
+$env:DB_NAME = "obligatorio"
+$env:DB_USER = "<usuario MySQL>"
+$env:DB_PASSWORD = "<contraseña MySQL>"
 ```
 
-MySQL queda disponible desde esta computadora en `localhost:3307`. Entre
-contenedores, el backend debe conectarse al host `db` y al puerto `3306`; Docker
-les proporciona esa red automáticamente. La configuración aún no ejecuta
-`BaseDeDatos/DataGrip.sql`: ese script crea la base y usuarios, por lo que su
-inicialización se coordinará con la configuración final de la aplicación.
+La conexión a MySQL y el inicio de sesión dentro de la aplicación son pasos
+distintos. La cuenta de aplicación y su rol se validan en la tabla `login`.
+Cambie las credenciales de ejemplo del script antes de compartir o usar el
+sistema fuera de un entorno de prueba.
 
-Para detener los servicios sin borrar los datos:
+### Ejecutar
 
 ```powershell
-docker compose -f Dockerización/docker-compose.yml down
+python .\Programa\programa.py
 ```
-
-El volumen de MySQL conserva la información. No uses `down -v` salvo que
-realmente quieras borrarla.
 
 ---
 
 ## Estructura del proyecto
 
-```Txt
+```text
 ObligatorioBD/
-│
-├── backend/
-│   ├── 
-│   ├── 
-│   ├── 
-│   ├── 
-│   └── 
-│
-├── frontend/
-│
 ├── BaseDeDatos/
-│   ├── 
-│   ├── 
-│   ├── 
-│   └── 
-│
-├── docs/
-│   ├── 
-│   ├── 
-│   └── 
-│
-├── 
-├── 
+│   └── DataGrip.sql
+├── Documentos/
+│   ├── Bitácora.docx
+│   ├── Manual de uso.md
+│   └── Obligatorio BD - Segundo Semestre 2026.pdf
+├── Programa/
+│   └── programa.py
 └── README.md
 ```
 
@@ -277,13 +202,15 @@ ObligatorioBD/
 
 ## Seguridad
 
-La aplicación contempla:
+La aplicación y la base de datos contemplan:
 
-- Validaciones en frontend.
-- Validaciones en backend.
-- Restricciones de integridad en la base de datos.
-- Gestión de permisos por rol.
-- Usuarios de base de datos con privilegios diferenciados.
+- Consultas SQL parametrizadas en el programa.
+- Restricciones de integridad y disparadores MySQL.
+- Menús de la aplicación diferenciados según el rol validado en la tabla `login`.
+- El script SQL define cuentas MySQL con permisos distintos para sus roles.
+
+Las credenciales incluidas en el script son de ejemplo y deben cambiarse antes
+de usar o compartir el sistema fuera de un entorno de prueba.
 
 ---
 
@@ -305,8 +232,6 @@ Según lo solicitado en la consigna.
 
 El repositorio incluye:
 
-- Script completo de creación de base de datos.
-- Datos iniciales.
-- Informe.
-- Bitácora del trabajo.
-- Manual de uso y ejecución local (Docs/Manual%20de%20uso.md).
+- Script de creación de la base y datos iniciales: `BaseDeDatos/DataGrip.sql`.
+- Bitácora del trabajo y manual de uso en `Documentos/`.
+- Consigna del obligatorio en `Documentos/`.

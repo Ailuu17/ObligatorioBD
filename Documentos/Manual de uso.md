@@ -8,14 +8,12 @@ Este manual describe el uso del sistema desde un menú de opciones seleccionable
 
 Los nombres de las opciones que aparecen a continuación son descriptivos: se debe elegir la opción que muestre el menú, sin asumir números fijos.
 
-> Verificar los pasos de ejecución y las opciones cuando el programa.py esté implementado.
-
 ### 2. Roles
 
-| Rol | Acciones previstas |
+| Rol | Acciones disponibles |
 |---|---|
-| Administrador | Gestionar los datos del torneo, organizar equipos y planteles, programar partidos, administrar sanciones y consultar reportes. |
-| Planillero | Consultar los partidos y registrar sus planillas, los jugadores participantes, los goles y las tarjetas. No administra los datos generales del torneo. |
+| Administrador | Gestionar jugadores, equipos, planteles, complejos, canchas, partidos y sanciones; consultar reportes. |
+| Planillero | Registrar planillas, goles, tarjetas y capitanes; corregir o eliminar goles dentro del plazo permitido; marcar partidos como jugados y consultar partidos y posiciones. |
 | Jugador | Consultar los partidos y sus estadísticas. No administra ningún dato del torneo. |
 
 Cada usuario debe ingresar con la cuenta y el rol que le haya asignado la organización. Las opciones disponibles en el menú dependen del rol; si una opción no aparece, se debe solicitar acceso al administrador.
@@ -27,13 +25,23 @@ Cada usuario debe ingresar con la cuenta y el rol que le haya asignado la organi
 - Python instalado.
 - Servidor MySQL instalado y en ejecución.
 - Acceso a la raíz del proyecto y a una cuenta MySQL con permisos para preparar la base.
+- Paquete de Python `mysql-connector-python`.
 
 #### Preparar la base de datos
 
 1. Abra `BaseDeDatos/DataGrip.sql` en un entorno MySQL (por ejemplo MySQL Workbench o DataGrip).
-2. Conéctese con una cuenta administradora de MySQL y ejecute el script completo (es importante ejecutarlo en el orden que está escrito, no lo desordenes) una sola vez sobre una instalación limpia.
+2. Conéctese con una cuenta administradora de MySQL y ejecute el script completo una sola vez sobre una instalación limpia; respete el orden del archivo.
 3. El script crea la base `obligatorio`, sus tablas, restricciones, disparadores, usuarios y datos de prueba. Si la base o sus tablas ya existen, la ejecución puede fallar; no vuelva a ejecutarlo sobre datos que quiera conservar. 
-4. Configure la conexión del programa con los datos del servidor y una cuenta autorizada. 
+4. Desde PowerShell, instale el conector y configure la conexión. El programa lee variables de entorno; no carga un archivo `.env` automáticamente:
+
+```powershell
+python -m pip install mysql-connector-python
+$env:DB_HOST = "localhost"
+$env:DB_PORT = "3306"
+$env:DB_NAME = "obligatorio"
+$env:DB_USER = "<usuario MySQL>"
+$env:DB_PASSWORD = "<contraseña MySQL>"
+```
 
 El script SQL contiene credenciales de ejemplo para sus cuentas de base de datos. Cámbielas antes de compartir o utilizar el sistema fuera de un entorno de prueba y no reutilice contraseñas de ejemplo.
 
@@ -42,10 +50,10 @@ El script SQL contiene credenciales de ejemplo para sus cuentas de base de datos
 Desde PowerShell, ubicado en la carpeta raíz del proyecto:
 
 ```powershell
-python .\Backend\Backend.py
+python .\Programa\programa.py
 ```
 
-El programa mostrará la pantalla inicial.
+Primero se establece la conexión a MySQL y luego se solicita el correo y la contraseña de una cuenta de aplicación existente en la tabla `login`.
 
 ### 4. Navegación por el menú
 
@@ -61,18 +69,18 @@ No cierre la ventana mientras una operación se está guardando. Al salir, esper
 
 El menú de administración puede agrupar las opciones de la siguiente manera:
 
-- **Facultades y jugadores:** consultar, dar de alta, modificar o dar de baja registros; asociar cada jugador con su facultad y tipo (grado, posgrado, docente o funcionario).
-- **Torneos:** crear o consultar una edición, indicando año, semestre, fechas y estado (inscripción, en curso o finalizado).
+- **Jugadores:** consultar, dar de alta, modificar o dar de baja registros; al crear o editar un jugador, asociarlo con una facultad existente y su tipo (grado, posgrado, docente o funcionario). El programa no tiene un menú para administrar facultades.
+- **Torneos:** la edición y los datos de ejemplo se preparan en el script SQL; el programa no tiene un menú para crear o modificar torneos.
 - **Equipos y planteles:** crear equipos, inscribirlos en una edición, asignar capitán, agregar jugadores y números de camiseta.
 - **Complejos, canchas y turnos:** registrar los lugares y franjas horarias disponibles para programar partidos.
 - **Fixture y partidos:** crear y consultar fechas, equipos participantes, cancha, turno y estado del partido.
-- **Sanciones:** consultar las sanciones vigentes y registrar sanciones disciplinarias cuando corresponda.
+- **Sanciones:** registrar, modificar, eliminar y consultar sanciones. Las sanciones por tarjeta roja o acumulación de amarillas no se generan automáticamente; el administrador debe registrarlas.
 - **Reportes:** elegir una consulta, indicar los filtros disponibles (por ejemplo, edición o fecha) y revisar los resultados en pantalla.
 
 #### Orden sugerido para crear una nueva edición
 
-1. Registrar las facultades y los jugadores.
-2. Crear la edición del torneo.
+1. Verificar que las facultades y la edición del torneo estén cargadas en la base de datos; el script incluye datos de ejemplo.
+2. Registrar los jugadores.
 3. Registrar los equipos e inscribirlos en esa edición.
 4. Formar los planteles, asignar capitanes y números de camiseta.
 5. Registrar complejos, canchas y turnos.
@@ -82,7 +90,7 @@ El sistema rechaza datos que incumplan las reglas del torneo o las relaciones ex
 
 ### 6. Funciones del planillero
 
-Para registrar un partido:
+Para cargar los datos de un partido:
 
 1. Ingrese al menú de planillero y seleccione la consulta o el registro de planillas.
 2. Elija el torneo y el partido disputado que corresponda.
@@ -91,14 +99,14 @@ Para registrar un partido:
 5. Registre las tarjetas amarillas y rojas con el jugador, el color y el minuto.
 6. Revise los datos cargados y confirme el registro.
 
-El resultado del partido se calcula automaticamente a partir de los goles ingresados; no se debe cargar manualmente. Solo pueden figurar jugadores de los dos equipos del partido que pertenezcan al plantel y no estén suspendidos. Los goles y las tarjetas deben corresponder a jugadores incluidos en la planilla.
+El resultado del partido se calcula automáticamente a partir de los goles ingresados; no se debe cargar manualmente. MySQL impide incluir en la planilla a un jugador suspendido y exige que los goles y las tarjetas correspondan a jugadores que figuren en ella. El programa no valida que el equipo indicado para cada jugador sea uno de los dos equipos del partido ni que el jugador pertenezca a su plantel; el planillero debe comprobarlo antes de registrar la planilla.
 
 Si el partido ya está marcado como jugado, el planillero puede modificar o eliminar goles durante las 48 horas posteriores al fin programado del turno. El programa calcula el plazo con la hora local del equipo donde se ejecuta; MySQL también lo verifica al guardar. Para evitar diferencias entre ambas validaciones, los relojes deben estar sincronizados.
 
 ### 7. Sanciones y reglas de los torneos
 
-- Una tarjeta roja o la acumulación de tres tarjetas amarillas en la edición genera una suspensión automática de una fecha.
-- La suspensión se cumple en la fecha siguiente del torneo. Un jugador suspendido no puede incluirse en la planilla de un partido que se abarque por esa sanción.
+- Las sanciones por tarjeta roja o acumulación de amarillas deben ser registradas manualmente por el administrador; el sistema no las genera automáticamente.
+- Un jugador con una sanción vigente no puede incluirse en la planilla de un partido comprendido por esa sanción.
 - La organización puede registrar sanciones disciplinarias de varias fechas.
 - Un partido solo puede marcarse como jugado una vez que su día y turno hayan pasado.
 - Un partido jugado no se puede eliminar. La corrección de su resultado está limitada a las 48 horas posteriores al fin programado del turno.
@@ -129,7 +137,7 @@ Los resultados dependen de la información cargada y de los filtros seleccionado
 | No se puede conectar a MySQL | Verifique que el servidor esté activo y que la configuración de conexión sea correcta. |
 | No se encuentra el registro seleccionado | Compruebe que el jugador, equipo, torneo, cancha o turno ya esté cargado. |
 | No se puede guardar por una regla del torneo | Revise los datos ingresados y las restricciones indicadas en pantalla; por ejemplo, la elegibilidad del jugador o la disponibilidad de la cancha. |
-| Un jugador no puede agregarse a la planilla | Confirme que integre uno de los dos planteles participantes y que no esté suspendido. |
+| Un jugador no puede agregarse a la planilla | Confirme que no tenga una sanción vigente. Verifique manualmente que pertenezca a uno de los dos equipos participantes y a su plantel. |
 | La opción no está disponible | Verifique que haya ingresado con el rol correcto o solicite permisos al administrador. |
 
 ### 10. Cierre de sesión
