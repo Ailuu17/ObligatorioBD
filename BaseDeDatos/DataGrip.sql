@@ -1249,7 +1249,9 @@ WHERE p.estado = 'jugado';
 
 
 -- 7: Porcentaje de partidos jugados vs. postergados/cancelados
--- El 23,07692% que falta para completar el 100% es de los programados
+-- Por los cambios que realizamos, postergados y cancelados son lo mismo y la base de datos
+-- solo considera postergados, ni cancelados
+-- El 23,07692% que falta para completar el 100% es de los programados y reprogramados
 -- Porcentaje de jugados
 SELECT
     COUNT(*) * 100.0 /
