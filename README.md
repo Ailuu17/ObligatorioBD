@@ -36,11 +36,11 @@ Puede realizar:
 
 - ABM de jugadores.
 - ABM de equipos.
-- Gestión de planteles.
 - ABM de complejos deportivos.
 - ABM de canchas.
 - ABM de partidos.
 - Gestión de sanciones.
+- Gestión de planteles.
 - Consulta de reportes.
 
 ### Planillero
@@ -98,16 +98,18 @@ Puede consultar la tabla de posiciones, partidos, goles, tarjetas y sanciones.
 
 ### Reportes
 
-- Tabla de posiciones.
+- Cantidad de jugadores por facultad y por tipo.
+- Cantidad de sanciones por equipo y por motivo.
 - Tabla de goleadores.
-- Ranking Fair Play.
-- Promedio de goles.
-- Uso de canchas y turnos.
-- Estadísticas de jugadores por facultad.
-- Jugadores nunca convocados.
-- Sanciones por equipo y motivo.
+- Jugadores inscriptos en un plantel que nunca figuraron en una planilla de juego.
+- Canchas y turnos más utilizados.
+- Promedio de goles por partido en cada fecha y en toda la edición.
 - Porcentaje de partidos jugados vs. postergados.
-- Consultas adicionales propuestas por el equipo.
+- Tabla de fair play por equipo.
+- Tabla de posiciones por edición del torneo.
+- Top 10 jugadores con más sanciones.
+- Top 3 facultades con más goles.
+- Jugador con más tarjetas sacadas.
 
 ---
 
@@ -120,6 +122,7 @@ La base de datos se construye sobre las entidades principales:
 - Jugador
 - Torneo
 - Equipo
+- Equipo_Torneo
 - Equipo_Jugador_Torneo
 - Complejo
 - Cancha
@@ -129,6 +132,7 @@ La base de datos se construye sobre las entidades principales:
 - Gol
 - Tarjeta
 - Sancion_Jugador
+- Capitan_Partido
 
 Definidas según el modelo propuesto en la consigna.
 
