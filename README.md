@@ -159,16 +159,7 @@ datos de ejemplo. No lo vuelva a ejecutar sobre una base que quiera conservar.
 
 ### Configurar la conexión
 
-El programa lee las variables de entorno del proceso; no carga un archivo
-`.env` automáticamente. En PowerShell, defínalas antes de iniciar el programa:
-
-```powershell
-$env:DB_HOST = "localhost"
-$env:DB_PORT = "3306"
-$env:DB_NAME = "obligatorio"
-$env:DB_USER = "<usuario MySQL>"
-$env:DB_PASSWORD = "<contraseña MySQL>"
-```
+El programa se conecta de forma directa a MySQL en `localhost:3306` (base de datos `obligatorio`). Si la conexión con las credenciales por defecto falla, el propio programa solicita ingresar host, usuario y contraseña por consola al iniciar.
 
 La conexión a MySQL y el inicio de sesión dentro de la aplicación son pasos
 distintos. La cuenta de aplicación y su rol se validan en la tabla `login`.

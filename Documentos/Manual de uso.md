@@ -32,16 +32,13 @@ Cada usuario debe ingresar con la cuenta y el rol que le haya asignado la organi
 1. Abra `BaseDeDatos/DataGrip.sql` en un entorno MySQL (por ejemplo MySQL Workbench o DataGrip).
 2. Conéctese con una cuenta administradora de MySQL y ejecute el script completo una sola vez sobre una instalación limpia; respete el orden del archivo.
 3. El script crea la base `obligatorio`, sus tablas, restricciones, disparadores, usuarios y datos de prueba. Si la base o sus tablas ya existen, la ejecución puede fallar; no vuelva a ejecutarlo sobre datos que quiera conservar. 
-4. Desde PowerShell, instale el conector y configure la conexión. El programa lee variables de entorno; no carga un archivo `.env` automáticamente:
+4. Desde PowerShell, instale el conector de MySQL:
 
 ```powershell
 python -m pip install mysql-connector-python
-$env:DB_HOST = "localhost"
-$env:DB_PORT = "3306"
-$env:DB_NAME = "obligatorio"
-$env:DB_USER = "<usuario MySQL>"
-$env:DB_PASSWORD = "<contraseña MySQL>"
 ```
+
+El programa se conecta por defecto a `localhost:3306` (base de datos `obligatorio`). Si las credenciales por defecto difieren de su entorno local, el programa le permitirá ingresarlas manualmente por consola al iniciar.
 
 El script SQL contiene credenciales de ejemplo para sus cuentas de base de datos. Cámbielas antes de compartir o utilizar el sistema fuera de un entorno de prueba y no reutilice contraseñas de ejemplo.
 

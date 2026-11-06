@@ -46,7 +46,6 @@ SEGURIDAD Y PROTECCIÓN:
 ================================================================================
 """
 
-import os
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime, timedelta, time, date
@@ -55,11 +54,11 @@ from datetime import datetime, timedelta, time, date
 # CONFIGURACIÓN DE CONEXIÓN A LA BASE DE DATOS
 # ==============================================================================
 DB_CONFIG = {
-    "host": os.environ.get("DB_HOST", "localhost"),
-    "port": int(os.environ.get("DB_PORT", 3306)),
-    "user": os.environ.get("DB_USER", "root"),
-    "password": os.environ.get("DB_PASSWORD", "Luc14n4.C0l37151107"),
-    "database": os.environ.get("DB_NAME", "obligatorio")
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "",
+    "database": "obligatorio"
 }
 
 
