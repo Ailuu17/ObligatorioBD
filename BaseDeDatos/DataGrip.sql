@@ -1179,6 +1179,7 @@ SELECT j.ci, j.nombre, j.apellido, COUNT(*) AS goles
 FROM gol g
 JOIN jugador j
     ON g.ci_jugador = j.ci
+WHERE g.autogol = FALSE
 GROUP BY j.ci, j.nombre, j.apellido
 ORDER BY goles DESC
 LIMIT 10;
