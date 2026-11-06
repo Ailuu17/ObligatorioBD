@@ -650,85 +650,6 @@ END;//
 
 DELIMITER ;
 
-DELIMITER //
-
-CREATE TRIGGER trigger_gol_plazo_insert
-BEFORE INSERT
-ON gol
-FOR EACH ROW
-BEGIN
-
-    DECLARE estado_partido VARCHAR(15);
-    DECLARE fecha_partido DATE;
-    DECLARE hora_fin TIME;
-
-    SELECT p.estado, p.dia, t.hora_fin
-    INTO estado_partido, fecha_partido, hora_fin
-    FROM partido p
-    JOIN turno t ON p.id_turno = t.id_turno
-    WHERE p.id_partido = NEW.id_partido
-      AND p.id_torneo = NEW.id_torneo;
-
-    IF estado_partido != 'jugado'
-       OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
-       OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'El resultado solo se puede cargar dentro de las 48 horas posteriores al fin del turno';
-    END IF;
-
-END;//
-
-DELIMITER ;
-
-DELIMITER //
-
-CREATE TRIGGER trigger_sancion_automatica_tarjeta
-AFTER INSERT
-ON tarjeta
-FOR EACH ROW
-BEGIN
-
-    DECLARE fecha_sancion INT;
-    DECLARE cantidad_amarillas INT;
-
-    SELECT numero_fecha
-    INTO fecha_sancion
-    FROM partido
-    WHERE id_partido = NEW.id_partido
-      AND id_torneo = NEW.id_torneo;
-
-    IF NEW.color IN ('roja', 'rojo') THEN
-        INSERT INTO sancion_jugador (
-            ci_jugador, id_torneo, motivo, numero_fecha_sancion,
-            numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
-        )
-        VALUES (
-            NEW.ci_jugador, NEW.id_torneo, 'roja',
-            fecha_sancion, fecha_sancion + 1, 1
-        );
-    ELSEIF NEW.color IN ('amarilla', 'amarillo') THEN
-        SELECT COUNT(*)
-        INTO cantidad_amarillas
-        FROM tarjeta
-        WHERE ci_jugador = NEW.ci_jugador
-          AND id_torneo = NEW.id_torneo
-          AND color IN ('amarilla', 'amarillo');
-
-        IF MOD(cantidad_amarillas, 3) = 0 THEN
-            INSERT INTO sancion_jugador (
-                ci_jugador, id_torneo, motivo, numero_fecha_sancion,
-                numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
-            )
-            VALUES (
-                NEW.ci_jugador, NEW.id_torneo, 'acumulación de amarillas',
-                fecha_sancion, fecha_sancion + 1, 1
-            );
-        END IF;
-    END IF;
-
-END;//
-
-DELIMITER ;
 
 
 -- Insertamos los valores en cada una de las tablas
@@ -1152,6 +1073,85 @@ INSERT INTO gol VALUES
 (27,8,1,68955786,30,false),
 (28,8,1,60606060,48,false);
 
+DELIMITER //
+
+CREATE TRIGGER trigger_gol_plazo_insert
+BEFORE INSERT
+ON gol
+FOR EACH ROW
+BEGIN
+
+    DECLARE estado_partido VARCHAR(15);
+    DECLARE fecha_partido DATE;
+    DECLARE hora_fin TIME;
+
+    SELECT p.estado, p.dia, t.hora_fin
+    INTO estado_partido, fecha_partido, hora_fin
+    FROM partido p
+    JOIN turno t ON p.id_turno = t.id_turno
+    WHERE p.id_partido = NEW.id_partido
+      AND p.id_torneo = NEW.id_torneo;
+
+    IF estado_partido != 'jugado'
+       OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
+       OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El resultado solo se puede cargar dentro de las 48 horas posteriores al fin del turno';
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER trigger_sancion_automatica_tarjeta
+AFTER INSERT
+ON tarjeta
+FOR EACH ROW
+BEGIN
+
+    DECLARE fecha_sancion INT;
+    DECLARE cantidad_amarillas INT;
+
+    SELECT numero_fecha
+    INTO fecha_sancion
+    FROM partido
+    WHERE id_partido = NEW.id_partido
+      AND id_torneo = NEW.id_torneo;
+
+    IF NEW.color IN ('roja', 'rojo') THEN
+        INSERT INTO sancion_jugador (
+            ci_jugador, id_torneo, motivo, numero_fecha_sancion,
+            numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+        )
+        VALUES (
+            NEW.ci_jugador, NEW.id_torneo, 'roja',
+            fecha_sancion, fecha_sancion + 1, 1
+        );
+    ELSEIF NEW.color IN ('amarilla', 'amarillo') THEN
+        SELECT COUNT(*)
+        INTO cantidad_amarillas
+        FROM tarjeta
+        WHERE ci_jugador = NEW.ci_jugador
+          AND id_torneo = NEW.id_torneo
+          AND color IN ('amarilla', 'amarillo');
+
+        IF MOD(cantidad_amarillas, 3) = 0 THEN
+            INSERT INTO sancion_jugador (
+                ci_jugador, id_torneo, motivo, numero_fecha_sancion,
+                numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+            )
+            VALUES (
+                NEW.ci_jugador, NEW.id_torneo, 'acumulación de amarillas',
+                fecha_sancion, fecha_sancion + 1, 1
+            );
+        END IF;
+    END IF;
+
+END;//
+
+DELIMITER ;
 
 -- Realizamos las consultas que se pedían 
 
