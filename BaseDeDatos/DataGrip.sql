@@ -514,6 +514,71 @@ DELIMITER ;
 
 DELIMITER //
 
+CREATE TRIGGER trigger_tarjeta_planilla
+BEFORE INSERT
+ON tarjeta
+FOR EACH ROW
+BEGIN
+
+    DECLARE cantidad INT;
+
+    SELECT COUNT(*)
+    INTO cantidad
+    FROM planilla_partido
+    WHERE id_partido = NEW.id_partido
+      AND id_torneo = NEW.id_torneo
+      AND ci_jugador = NEW.ci_jugador;
+
+    IF cantidad = 0 THEN
+
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Jugador no figura en planilla';
+
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER trigger_no_reprogramar_jugado
+BEFORE UPDATE
+ON partido
+FOR EACH ROW
+BEGIN
+
+    IF OLD.estado = 'jugado'
+       AND (NEW.estado != OLD.estado OR NEW.dia != OLD.dia OR NEW.id_turno != OLD.id_turno) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se puede cambiar el estado, la fecha o el turno de un partido jugado';
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER trigger_no_borrar_jugado
+BEFORE DELETE
+ON partido
+FOR EACH ROW
+BEGIN
+
+    IF OLD.estado = 'jugado' THEN
+
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No se puede borrar un partido jugado';
+
+    END IF;
+
+END;//
+
+DELIMITER ;
+
+DELIMITER //
+
 CREATE TRIGGER trigger_gol_plazo_update
 BEFORE UPDATE
 ON gol
@@ -532,7 +597,7 @@ BEGIN
     WHERE p.id_partido = OLD.id_partido
       AND p.id_torneo = OLD.id_torneo;
 
-    IF estado_partido <> 'jugado'
+    IF estado_partido != 'jugado'
        OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
        OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
         SIGNAL SQLSTATE '45000'
@@ -574,7 +639,7 @@ BEGIN
     WHERE p.id_partido = OLD.id_partido
       AND p.id_torneo = OLD.id_torneo;
 
-    IF estado_partido <> 'jugado'
+    IF estado_partido != 'jugado'
        OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
        OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
         SIGNAL SQLSTATE '45000'
@@ -587,63 +652,50 @@ DELIMITER ;
 
 DELIMITER //
 
-CREATE TRIGGER trigger_no_reprogramar_jugado
-BEFORE UPDATE
-ON partido
-FOR EACH ROW
-BEGIN
-
-    IF OLD.estado = 'jugado'
-       AND (NEW.estado <> OLD.estado OR NEW.dia <> OLD.dia OR NEW.id_turno <> OLD.id_turno) THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'No se puede cambiar el estado, la fecha o el turno de un partido jugado';
-    END IF;
-
-END;//
-
-DELIMITER ;
-
-DELIMITER //
-
-CREATE TRIGGER trigger_tarjeta_planilla
-BEFORE INSERT
+-- A partir de que se levanta este trigger, se insertan los datos en la tabla sancion_jugador automáticamente.
+-- Por eso, los INSERT a sancion_jugador no deberían correrse manualmente a menos que se cree este trigger posterior a los inserts manuales
+CREATE TRIGGER trigger_sancion_automatica_tarjeta
+AFTER INSERT
 ON tarjeta
 FOR EACH ROW
 BEGIN
 
-    DECLARE cantidad INT;
+    DECLARE fecha_sancion INT;
+    DECLARE cantidad_amarillas INT;
 
-    SELECT COUNT(*)
-    INTO cantidad
-    FROM planilla_partido
+    SELECT numero_fecha
+    INTO fecha_sancion
+    FROM partido
     WHERE id_partido = NEW.id_partido
-      AND id_torneo = NEW.id_torneo
-      AND ci_jugador = NEW.ci_jugador;
+      AND id_torneo = NEW.id_torneo;
 
-    IF cantidad = 0 THEN
+    IF NEW.color IN ('roja', 'rojo') THEN
+        INSERT INTO sancion_jugador (
+            ci_jugador, id_torneo, motivo, numero_fecha_sancion,
+            numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+        )
+        VALUES (
+            NEW.ci_jugador, NEW.id_torneo, 'roja',
+            fecha_sancion, fecha_sancion + 1, 1
+        );
+    ELSEIF NEW.color IN ('amarilla', 'amarillo') THEN
+        SELECT COUNT(*)
+        INTO cantidad_amarillas
+        FROM tarjeta
+        WHERE ci_jugador = NEW.ci_jugador
+          AND id_torneo = NEW.id_torneo
+          AND color IN ('amarilla', 'amarillo');
 
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Jugador no figura en planilla';
-
-    END IF;
-
-END;//
-
-DELIMITER ;
-
-DELIMITER //
-
-CREATE TRIGGER trigger_no_borrar_jugado
-BEFORE DELETE
-ON partido
-FOR EACH ROW
-BEGIN
-
-    IF OLD.estado = 'jugado' THEN
-
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'No se puede borrar un partido jugado';
-
+        IF MOD(cantidad_amarillas, 3) = 0 THEN
+            INSERT INTO sancion_jugador (
+                ci_jugador, id_torneo, motivo, numero_fecha_sancion,
+                numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+            )
+            VALUES (
+                NEW.ci_jugador, NEW.id_torneo, 'acumulación de amarillas',
+                fecha_sancion, fecha_sancion + 1, 1
+            );
+        END IF;
     END IF;
 
 END;//
@@ -865,10 +917,9 @@ INSERT INTO tarjeta VALUES
 (3,1,1 ,10041004,31,'amarilla'),
 (4,1,1, 50000000,3,'amarilla');
 
+-- Si está creado el trigger trigger_sancion_automatica_tarjeta, no se debe realizar este insert
 INSERT INTO sancion_jugador VALUES
-(1,10041004,1,'acumulación de amarillas',1,2,1),
-(2,88888888,1,'roja',1,2,1),
-(3,57872451,1,'acumulación de amarillas',1,2,1);
+(1,10041004,1,'acumulación de amarillas',1,2,1);
 
 INSERT INTO capitan_partido VALUES
 (1,1,1,12345678,0),
@@ -898,11 +949,15 @@ INSERT INTO planilla_partido VALUES
 (2,1,40000007,4);
 
 INSERT INTO tarjeta VALUES
-(5,2,1, 88888888,15,'roja');
+(5,2,1,47777777,10,'roja'),
+(6,2,1,88888888,15,'roja');
 
+-- Si se creó el trigger antes, de este insert solo hay que insertar la sanción disciplinaria.
 INSERT INTO sancion_jugador VALUES
-(4,54000000,1,'disciplinaria',2,3,2),
-(5,15951595,1,'disciplinaria',2,3,2);
+(2,47777777,1,'roja',2,3,1),
+(3,88888888,1,'roja',2,3,1);
+INSERT INTO sancion_jugador VALUES
+(4,49999999,1,'disciplinaria',2,3,2);
 
 INSERT INTO capitan_partido VALUES
 (2,1,3,12312345,0),
@@ -930,14 +985,13 @@ INSERT INTO planilla_partido VALUES
 (3,1,88899978,6);
 
 INSERT INTO tarjeta VALUES
-(6,3,1, 57872451,23,'amarilla'),
-(7,3,1, 57872451,27,'amarilla'),
-(8,3,1, 57872451,38,'amarilla');
+(7,3,1, 57872451,23,'amarilla'),
+(8,3,1, 57872451,27,'amarilla'),
+(9,3,1, 57872451,38,'amarilla');
 
+-- Si se creó en trigger de sanción antes, este insert no hay que correrlo
 INSERT INTO sancion_jugador VALUES
-(6,47777777,1,'roja',3,4,1),
-(7,49999999,1,'disciplinaria',3,4,2),
-(8,77771111,1,'roja',3,4,1);
+(5,57872451,1,'acumulación de amarillas',1,2,1);
 
 INSERT INTO capitan_partido VALUES
 (3,1,5,56786780,0),
@@ -962,7 +1016,7 @@ INSERT INTO planilla_partido VALUES
 (4,1,77777777,3);
 
 INSERT INTO tarjeta VALUES
-(9,4,1, 77777777,40,'amarilla');
+(10,4,1, 77777777,40,'amarilla');
 
 INSERT INTO capitan_partido VALUES
 (4,1,1,12345678,0),
@@ -988,7 +1042,11 @@ INSERT INTO planilla_partido VALUES
 (5,1,58787872,5);
 
 INSERT INTO tarjeta VALUES
-(10,5,1,10000000,27,'amarilla');
+(11,5,1,10000000,27,'amarilla');
+
+-- Este insert hay que correrlo esté o no creado el trigger
+INSERT INTO sancion_jugador VALUES
+(6,54000000,1,'disciplinaria',2,3,2);
 
 INSERT INTO capitan_partido VALUES
 (5,1,2,87456321,0),
@@ -1013,7 +1071,7 @@ INSERT INTO planilla_partido VALUES
 (6,1,67854555,6);
 
 INSERT INTO tarjeta VALUES
-(11,6,1,98789878,14,'amarilla');
+(12,6,1,98789878,14,'amarilla');
 
 INSERT INTO capitan_partido VALUES
 (6,1,4,99999999,0),
@@ -1029,13 +1087,17 @@ INSERT INTO planilla_partido VALUES
 (7,1,15151515,1),
 (7,1,89785876,1),
 (7,1,57777777,4),
-(7,1,49999999,4),
+(7,1,44747444,4),
 (7,1,78787333,4),
 (7,1,98789878,4),
 (7,1,47777777,4);
 
 INSERT INTO tarjeta VALUES
-(12,7,1,47777777,40,'roja');
+(13,7,1,47777777,40,'roja');
+
+-- Si está creado el trigger de sanción, este insert no hay que correrlo
+INSERT INTO sancion_jugador VALUES
+(7,47777777,1,'roja',3,4,1);
 
 INSERT INTO capitan_partido VALUES
 (7,1,1,12345678,0),
@@ -1059,8 +1121,12 @@ INSERT INTO planilla_partido VALUES
 (8,1,78555691,6);
 
 INSERT INTO tarjeta VALUES
-(13,8,1,78555691,22,'amarilla'),
-(14,8,1,77771111,21, 'roja');
+(14,8,1,78555691,22,'amarilla'),
+(15,8,1,77771111,21, 'roja');
+
+-- Si está creado el trigger de sanción, este insert no hay que correrlo
+INSERT INTO sancion_jugador VALUES
+(8,77771111,1,'roja',3,4,1);
 
 INSERT INTO capitan_partido VALUES
 (8,1,2,87456321,0),
@@ -1073,89 +1139,9 @@ INSERT INTO gol VALUES
 (27,8,1,68955786,30,false),
 (28,8,1,60606060,48,false);
 
-DELIMITER //
+-- Realizamos las consultas que se pedían
 
-CREATE TRIGGER trigger_gol_plazo_insert
-BEFORE INSERT
-ON gol
-FOR EACH ROW
-BEGIN
-
-    DECLARE estado_partido VARCHAR(15);
-    DECLARE fecha_partido DATE;
-    DECLARE hora_fin TIME;
-
-    SELECT p.estado, p.dia, t.hora_fin
-    INTO estado_partido, fecha_partido, hora_fin
-    FROM partido p
-    JOIN turno t ON p.id_turno = t.id_turno
-    WHERE p.id_partido = NEW.id_partido
-      AND p.id_torneo = NEW.id_torneo;
-
-    IF estado_partido <> 'jugado'
-       OR NOW() < TIMESTAMP(fecha_partido, hora_fin)
-       OR NOW() > DATE_ADD(TIMESTAMP(fecha_partido, hora_fin), INTERVAL 48 HOUR) THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'El resultado solo se puede cargar dentro de las 48 horas posteriores al fin del turno';
-    END IF;
-
-END;//
-
-DELIMITER ;
-
-DELIMITER //
-
-CREATE TRIGGER trigger_sancion_automatica_tarjeta
-AFTER INSERT
-ON tarjeta
-FOR EACH ROW
-BEGIN
-
-    DECLARE fecha_sancion INT;
-    DECLARE cantidad_amarillas INT;
-
-    SELECT numero_fecha
-    INTO fecha_sancion
-    FROM partido
-    WHERE id_partido = NEW.id_partido
-      AND id_torneo = NEW.id_torneo;
-
-    IF NEW.color IN ('roja', 'rojo') THEN
-        INSERT INTO sancion_jugador (
-            ci_jugador, id_torneo, motivo, numero_fecha_sancion,
-            numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
-        )
-        VALUES (
-            NEW.ci_jugador, NEW.id_torneo, 'roja',
-            fecha_sancion, fecha_sancion + 1, 1
-        );
-    ELSEIF NEW.color IN ('amarilla', 'amarillo') THEN
-        SELECT COUNT(*)
-        INTO cantidad_amarillas
-        FROM tarjeta
-        WHERE ci_jugador = NEW.ci_jugador
-          AND id_torneo = NEW.id_torneo
-          AND color IN ('amarilla', 'amarillo');
-
-        IF MOD(cantidad_amarillas, 3) = 0 THEN
-            INSERT INTO sancion_jugador (
-                ci_jugador, id_torneo, motivo, numero_fecha_sancion,
-                numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
-            )
-            VALUES (
-                NEW.ci_jugador, NEW.id_torneo, 'acumulación de amarillas',
-                fecha_sancion, fecha_sancion + 1, 1
-            );
-        END IF;
-    END IF;
-
-END;//
-
-DELIMITER ;
-
--- Realizamos las consultas que se pedían 
-
--- 1: Cantidad de jugadores por facultad y por tipo 
+-- 1: Cantidad de jugadores por facultad y por tipo
 -- Por facultad:
 SELECT f.nombre, COUNT(*) AS cantidad_jugadores
 FROM facultad f
@@ -1362,7 +1348,7 @@ GROUP BY t.id_torneo, t.nombre, t.año, t.semestre, e.id_equipo, e.nombre
 ORDER BY t.id_torneo, puntos DESC, diferencia_goles DESC, goles_favor DESC, equipo;
 
 
--- Realizamos las 3 consultas a elección nuestra 
+-- Realizamos las 3 consultas a elección nuestra
 
 -- 1: Top 10 jugadores con más sanciones
 SELECT j.ci, j.nombre, j.apellido, COUNT(*) AS cantidad_sanciones
