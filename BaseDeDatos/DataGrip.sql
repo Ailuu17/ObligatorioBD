@@ -173,7 +173,7 @@ Create table sancion_jugador(
     FOREIGN KEY (ci_jugador) REFERENCES jugador(ci)
 );
 
--- Fue creada para registrar cualquier cambio de capitán que se de en el partido
+-- Fue creada para registrar cualquier cambio de capitán que se dé en el partido
 Create Table capitan_partido(
     id_partido INT,
     id_torneo INT,
@@ -1197,7 +1197,7 @@ WHERE NOT EXISTS (
 );
 
 
--- 5: Canchas y turnos más utilizados
+-- 5: Canchas y turnos más utilizados.
 -- Canchas:
 SELECT nombre_cancha, COUNT(*) AS cantidad_usos
 FROM partido
@@ -1238,7 +1238,7 @@ WHERE p.estado = 'jugado';
 -- 7: Porcentaje de partidos jugados vs. postergados/cancelados
 -- Por los cambios que realizamos, postergados y cancelados son lo mismo y la base de datos
 -- solo considera postergados, ni cancelados
--- El 23,07692% que falta para completar el 100% es de los programados y reprogramados
+-- El 23,07692% que falta para completar el 100% es de los programados y reprogramados.
 -- Porcentaje de jugados
 SELECT
     COUNT(*) * 100.0 /
@@ -1269,7 +1269,7 @@ JOIN equipo_jugador_torneo ejt
 JOIN equipo e
     ON ejt.id_equipo = e.id_equipo
 GROUP BY e.id_equipo, e.nombre
-ORDER BY puntaje_fair_play ASC;
+ORDER BY puntaje_fair_play DESC;
 
 
 -- 9: Tabla de posiciones por edición del torneo
