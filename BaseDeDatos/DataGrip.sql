@@ -1269,7 +1269,7 @@ JOIN equipo_jugador_torneo ejt
 JOIN equipo e
     ON ejt.id_equipo = e.id_equipo
 GROUP BY e.id_equipo, e.nombre
-ORDER BY puntaje_fair_play ASC;
+ORDER BY puntaje_fair_play DESC;
 
 
 -- 9: Tabla de posiciones por edición del torneo
