@@ -1564,13 +1564,53 @@ def planillero_registrar_tarjeta(conexion):
     sug_id = obtener_siguiente_id(conexion, "tarjeta", "id_tarjeta")
     id_tarjeta = pedir_entero("ID Tarjeta", sugerido=sug_id)
 
+    # Obtenemos el ID máximo previo de sanción para detectar si el trigger genera una nueva
+    _, r_max_sanc = ejecutar_consulta(conexion, "SELECT COALESCE(MAX(id_sancion), 0) FROM sancion_jugador")
+    max_id_sancion_prev = r_max_sanc[0][0] if r_max_sanc else 0
+
+    # Si es amarilla, contamos cuántas tenía acumuladas antes de insertar
+    cant_amarillas_prev = 0
+    if color == "amarilla":
+        sql_cant = """
+            SELECT COUNT(*) FROM tarjeta
+            WHERE ci_jugador = %s AND id_torneo = %s AND color IN ('amarilla', 'amarillo')
+        """
+        _, r_cant = ejecutar_consulta(conexion, sql_cant, (ci_jugador, id_torneo))
+        cant_amarillas_prev = r_cant[0][0] if r_cant else 0
+
     # Trigger de BD: el jugador debe figurar en la planilla del partido
     sql = """
         INSERT INTO tarjeta (id_tarjeta, id_partido, id_torneo, ci_jugador, minuto, color)
         VALUES (%s, %s, %s, %s, %s, %s)
     """
-    ejecutar_dml(conexion, sql, (id_tarjeta, id_partido, id_torneo, ci_jugador, minuto, color),
-                 "Tarjeta registrada exitosamente.")
+    exito = ejecutar_dml(conexion, sql, (id_tarjeta, id_partido, id_torneo, ci_jugador, minuto, color),
+                         "Tarjeta registrada exitosamente.")
+
+    if exito:
+        # Verificamos si el trigger 'trigger_sancion_automatica_tarjeta' insertó automáticamente una sanción
+        sql_check_nueva = """
+            SELECT id_sancion, motivo, numero_fecha_sancion, numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+            FROM sancion_jugador
+            WHERE ci_jugador = %s AND id_torneo = %s AND id_sancion > %s
+            ORDER BY id_sancion DESC
+        """
+        _, nuevas_sanciones = ejecutar_consulta(conexion, sql_check_nueva, (ci_jugador, id_torneo, max_id_sancion_prev))
+        if nuevas_sanciones:
+            for s_id, s_motivo, s_fecha, s_inicio, s_cant in nuevas_sanciones:
+                print("\n" + "=" * 70)
+                print(" ⚠️  AVISO DE SANCIÓN AUTOMÁTICA (GENERADA POR TRIGGER) ".center(68))
+                print("=" * 70)
+                print(f" El jugador con CI {ci_jugador} queda sancionado por '{s_motivo}' en el partido {id_partido} (Fecha N° {s_fecha}).")
+                print(f" Su sanción comienza desde la Fecha N° {s_inicio} y se mantiene por {s_cant} fecha(s).")
+                print("=" * 70)
+        elif color == "amarilla":
+            total_amarillas = cant_amarillas_prev + 1
+            faltan = 3 - (total_amarillas % 3)
+            print(f"\n  ℹ️  Información: El jugador acumula {total_amarillas} tarjeta(s) amarilla(s) en este torneo.")
+            if faltan == 1:
+                print("  ⚠️  ¡Atención! Una tarjeta amarilla más provocará una sanción automática de 1 fecha.")
+            else:
+                print(f"  (Faltan {faltan} amarilla(s) para alcanzar una suspensión por acumulación).")
 
 
 def planillero_registrar_capitan(conexion):
