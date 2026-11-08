@@ -924,6 +924,39 @@ def admin_alta_sancion(conexion):
     fecha_ini = pedir_entero("Número de fecha desde que comienza a cumplir", minimo=1)
     cant_fechas = pedir_entero("Cantidad de fechas de suspensión", minimo=1)
 
+    # Verificación de duplicados: comprueba si ya existe una sanción idéntica (por ejemplo, generada por el trigger)
+    sql_check = """
+        SELECT id_sancion, motivo, numero_fecha_sancion, numero_fecha_inicio_sancion, cantidad_fechas_sancionadas
+        FROM sancion_jugador
+        WHERE ci_jugador = %s
+          AND id_torneo = %s
+          AND motivo = %s
+          AND numero_fecha_sancion = %s
+          AND numero_fecha_inicio_sancion = %s
+          AND cantidad_fechas_sancionadas = %s
+    """
+    _, existentes = ejecutar_consulta(conexion, sql_check, (ci_jugador, id_torneo, motivo, fecha_sanc, fecha_ini, cant_fechas))
+    if existentes:
+        id_existente = existentes[0][0]
+        print("\n" + "=" * 70)
+        print(" ⚠️  ADVERTENCIA: SANCIÓN DUPLICADA DETECTADA ".center(68))
+        print("=" * 70)
+        print(f" Ya existe un registro exactamente igual en la base de datos:")
+        print(f"  • ID Sanción existente: {id_existente}")
+        print(f"  • CI Jugador: {ci_jugador}")
+        print(f"  • ID Torneo: {id_torneo}")
+        print(f"  • Motivo: {motivo}")
+        print(f"  • Fecha de infracción: Fecha N° {fecha_sanc}")
+        print(f"  • Inicio de suspensión: Fecha N° {fecha_ini}")
+        print(f"  • Duración: {cant_fechas} fecha(s)")
+        print("\n Nota: Es muy probable que esta sanción ya haya sido agregada automáticamente")
+        print(" por el trigger al registrar la tarjeta correspondiente.")
+        print("=" * 70)
+        confirmar = pedir_opcion("¿Desea volver a ingresarla de todas formas?", ["si", "no"])
+        if confirmar == "no":
+            print("\n✓ Operación cancelada. No se duplicó el registro de la sanción.")
+            return
+
     sql = """
         INSERT INTO sancion_jugador (id_sancion, ci_jugador, id_torneo, motivo,
                                      numero_fecha_sancion, numero_fecha_inicio_sancion, cantidad_fechas_sancionadas)
